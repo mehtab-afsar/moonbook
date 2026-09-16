@@ -1,7 +1,7 @@
 import { type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { verifyAuth } from "@/lib/auth/verify";
+import { requireOwner, verifyAuth } from "@/lib/auth/verify";
 import { parseBody } from "@/lib/api/validate";
 import { apiErr, apiOk } from "@/lib/api/response";
 import { rpcError } from "@/lib/api/errors";
@@ -71,7 +71,7 @@ const issueSchema = z.object({
  * anything the browser said they were worth.
  */
 export async function POST(req: NextRequest) {
-  const auth = await verifyAuth();
+  const auth = await requireOwner();
   if (!auth.ok) return apiErr(auth.error, auth.status);
 
   const parsed = await parseBody(req, issueSchema);

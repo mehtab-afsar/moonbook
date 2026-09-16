@@ -55,6 +55,8 @@ export async function recordActivity(
     occurredOn: string;
     details?: Record<string, unknown>;
     reference?: string;
+    /** Who pays, when that is not who the work was done for. */
+    billToPartyId?: string;
   },
 ): Promise<string> {
   const { data, error } = await tenant.db
@@ -64,6 +66,7 @@ export async function recordActivity(
       p_occurred_on: opts.occurredOn,
       p_amount_minor: opts.amountMinor,
       p_details: (opts.details ?? {}) as never,
+      p_bill_to_party_id: opts.billToPartyId,
       p_reference: opts.reference,
       p_status: "completed",
     })

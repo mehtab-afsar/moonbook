@@ -1,4 +1,4 @@
-import { test as base, type BrowserContext, type Page } from "@playwright/test";
+import { test as base, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient, authCookies, signIn } from "./helpers/supabase";
 
@@ -51,6 +51,36 @@ let counter = 0;
 function uniqueSuffix(): string {
   counter += 1;
   return `${Date.now().toString(36)}${process.pid.toString(36)}${counter}`;
+}
+
+/**
+ * A second person in the same organisation, as a member of staff.
+ *
+ * There is no invite flow in the product yet — `create_organisation` makes its
+ * caller the owner and nothing else writes `profiles` — so the row is inserted
+ * with the service role, which is what an operator adding a colleague would do
+ * today. That absence is a real gap, but it is a separate one from whether the
+ * role is ENFORCED, which is what these tests are for.
+ */
+export async function addStaffMember(
+  browser: Browser,
+  baseURL: string,
+  tenant: Tenant,
+): Promise<Tenant> {
+  const email = `staff+${uniqueSuffix()}@moonbook.test`;
+  const { client, session } = await signIn(email);
+
+  const { data: user } = await client.auth.getUser();
+  const { error } = await adminClient()
+    .from("profiles")
+    .insert({ id: user.user!.id, org_id: tenant.orgId, role: "staff", full_name: "A Colleague" });
+  if (error) throw new Error(`addStaffMember: ${error.message}`);
+
+  const context = await browser.newContext();
+  await context.addCookies(authCookies(session, baseURL));
+  const page = await context.newPage();
+
+  return { email, orgId: tenant.orgId, orgName: tenant.orgName, db: client, page, context };
 }
 
 export const test = base.extend<{

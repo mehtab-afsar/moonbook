@@ -20,6 +20,7 @@ export interface EditableActivity {
   id: string;
   activity_type_id: string;
   party_id: string;
+  bill_to_party_id: string | null;
   occurred_on: string;
   reference: string | null;
   amount_minor: number;
@@ -58,6 +59,7 @@ export function ActivityForm({
   // foreign key, so changing it here would produce a row the database refuses.
   const [typeId, setTypeId] = useState(editing?.activity_type_id ?? types[0]?.id ?? "");
   const [partyId, setPartyId] = useState(editing?.party_id ?? "");
+  const [billToPartyId, setBillToPartyId] = useState(editing?.bill_to_party_id ?? "");
   const [occurredOn, setOccurredOn] = useState(
     editing?.occurred_on ?? new Date().toISOString().slice(0, 10),
   );
@@ -110,6 +112,9 @@ export function ActivityForm({
         body: JSON.stringify({
           ...(editing ? {} : { activity_type_id: typeId }),
           party_id: partyId,
+          // Empty means "the same party", which is the common case — a null
+          // here is not missing data, it is the absence of a third party.
+          bill_to_party_id: billToPartyId || null,
           occurred_on: occurredOn,
           reference: reference || null,
           details,
@@ -129,6 +134,7 @@ export function ActivityForm({
       setDetails({});
       setReference("");
       setManualAmount("");
+      setBillToPartyId("");
     }
     onDone?.();
     router.refresh();
@@ -171,6 +177,25 @@ export function ActivityForm({
             {parties.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
+          </select>
+        </Labelled>
+
+        {/* A load delivered to a consignee and invoiced to the broker who
+            booked it. Left blank — the common case — the work is billed to
+            the party it was done for. */}
+        <Labelled label="Bill to (if different)" htmlFor="billTo">
+          <select
+            id="billTo"
+            value={billToPartyId}
+            onChange={(e) => setBillToPartyId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">Same as party</option>
+            {parties
+              .filter((p) => p.id !== partyId)
+              .map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
           </select>
         </Labelled>
 

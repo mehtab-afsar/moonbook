@@ -39,7 +39,7 @@ export default async function ActivitiesPage() {
       // pin direction and org) and parties by two (party_id and
       // bill_to_party_id). Unnamed, either is an ambiguous-embed ERROR.
       .select(
-        "id, activity_type_id, party_id, occurred_on, amount_minor, currency, reference, status, details, dim1_key, dim1_value, activity_types!activities_activity_type_id_fkey(label_singular), parties!activities_party_id_fkey(name)",
+        "id, activity_type_id, party_id, bill_to_party_id, occurred_on, amount_minor, currency, reference, status, details, dim1_key, dim1_value, activity_types!activities_activity_type_id_fkey(label_singular), parties!activities_party_id_fkey(name)",
       )
       .order("occurred_on", { ascending: false })
       .limit(100),
@@ -55,7 +55,8 @@ export default async function ActivitiesPage() {
 
   const rows: LogRow[] = (activities ?? []).map((a) => {
     const row = a as unknown as {
-      id: string; activity_type_id: string; party_id: string; occurred_on: string;
+      id: string; activity_type_id: string; party_id: string;
+      bill_to_party_id: string | null; occurred_on: string;
       amount_minor: number; currency: string; reference: string | null; status: string;
       details: Record<string, unknown> | null; dim1_value: string | null;
       activity_types: { label_singular: string } | null;
@@ -65,6 +66,7 @@ export default async function ActivitiesPage() {
       id: row.id,
       activity_type_id: row.activity_type_id,
       party_id: row.party_id,
+      bill_to_party_id: row.bill_to_party_id,
       occurred_on: row.occurred_on,
       reference: row.reference,
       amount_minor: row.amount_minor,

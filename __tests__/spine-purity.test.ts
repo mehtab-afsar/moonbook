@@ -30,6 +30,13 @@ const ALLOWED = [
   // reportable field, exactly as record_activity does on the way in. A write
   // path, never a read one — nothing financial is computed from it here.
   "20260916000015_update_activity.sql",
+  // issue_document, superseded again for the owner guard. It carries the
+  // snapshot's printable_details lateral join forward unchanged.
+  "20260916000017_owner_only_money.sql",
+  // validate_activity_details, superseded so a date field must hold a real
+  // date. The trigger reads `details` to check its SHAPE and never its value
+  // for any financial purpose — the same standing exception as 0010.
+  "20260916000018_date_fields_must_be_dates.sql",
 ];
 
 /** Every `create [or replace] view ... as <body>;` in the migrations. */
