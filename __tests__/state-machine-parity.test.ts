@@ -17,16 +17,25 @@ import {
  * Neither announces itself. Both are one line in a migration away.
  */
 
-/** `constraint <name> check (<col> in ('a', 'b'))` → ["a", "b"]. */
+/**
+ * `constraint <name> check (<col> in ('a', 'b'))` → ["a", "b"].
+ *
+ * The LAST definition wins, because a constraint can be dropped and re-added
+ * by a later migration and the database keeps whichever applied last. An
+ * earlier version of this took the first match, so widening
+ * activity_fields_type_chk in 0019 left it comparing against the original list
+ * in 0005 — a guard reporting a drift that did not exist, which is the same
+ * failure as missing one that does.
+ */
 function sqlValues(constraintName: string): string[] | null {
   const sql = stripSqlComments(allSql());
   const re = new RegExp(
     `constraint\\s+${constraintName}\\s+check\\s*\\(\\s*[a-z_]+\\s+in\\s*\\(([^)]*)\\)`,
-    "i",
+    "gi",
   );
-  const m = re.exec(sql);
-  if (!m) return null;
-  return m[1]
+  const matches = [...sql.matchAll(re)];
+  if (matches.length === 0) return null;
+  return matches[matches.length - 1][1]
     .split(",")
     .map((v) => v.trim().replace(/^'|'$/g, ""))
     .filter((v) => v.length > 0);

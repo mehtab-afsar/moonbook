@@ -217,7 +217,7 @@ export function ActivityForm({
               label={field.label + (field.is_required ? "" : " (optional)")}
               htmlFor={`f-${field.key}`}
             >
-              <FieldInput field={field} value={details[field.key]} onChange={(v) => setField(field.key, v)} />
+              <FieldInput field={field} value={details[field.key]} onChange={(v) => setField(field.key, v)} currency={currency} />
             </Labelled>
           ))}
         </div>
@@ -269,10 +269,12 @@ function FieldInput({
   field,
   value,
   onChange,
+  currency,
 }: {
   field: ActivityField;
   value: unknown;
   onChange: (v: unknown) => void;
+  currency: string;
 }) {
   const id = `f-${field.key}`;
 
@@ -285,6 +287,24 @@ function FieldInput({
           onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
           className={`${inputClass} font-mono`}
         />
+      );
+    case "money":
+      // An amount, typed the way a person says it — 22, not 2200. The
+      // conversion to minor units happens once, on the server, using the
+      // organisation's currency. See migration 0019 for why this is its own
+      // type rather than a `number` with a note attached.
+      return (
+        <div className="relative">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-ink-3">
+            {currency}
+          </span>
+          <input
+            id={id} type="number" step="0.01" min="0" required={field.is_required}
+            value={value === undefined || value === null ? "" : String(value)}
+            onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
+            className={`${inputClass} pl-11 text-right font-mono`}
+          />
+        </div>
       );
     case "boolean":
       return (

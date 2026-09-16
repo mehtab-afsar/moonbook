@@ -6,7 +6,10 @@ import { parseBody } from "@/lib/api/validate";
 import { apiErr, apiOk } from "@/lib/api/response";
 import { rpcError } from "@/lib/api/errors";
 import { buildDetailsSchema, pruneEmpty, type ActivityField } from "@/lib/activities/details-schema";
-import { computeAmount, PricingError, type PricingStrategy, type PricingConfig } from "@/lib/pricing";
+import {
+  computeAmount, PricingError,
+  type PricingStrategy, type PricingConfig, type PricingField,
+} from "@/lib/pricing";
 
 export const runtime = "nodejs";
 
@@ -65,6 +68,12 @@ export async function POST(req: NextRequest) {
 
   // RLS scopes this to the caller's org, so a type from another tenant simply
   // isn't there — a 404, never a 403.
+  // The currency a `money` field's value is expressed in. Read from the
+  // organisation, never from the request — it decides what the number means.
+  const { data: org, error: orgErr } = await supabase
+    .from("organisations").select("base_currency").eq("id", auth.ctx.orgId).single();
+  if (orgErr) return apiErr("Could not load your organisation", 500);
+
   const { data: type, error: typeErr } = await supabase
     .from("activity_types")
     // FK named explicitly — activity_fields reaches activity_types by two
@@ -93,6 +102,10 @@ export async function POST(req: NextRequest) {
       config: (type.pricing_config ?? {}) as PricingConfig,
       details,
       manualAmountMinor: v.amount_minor,
+      // A `money` rate is typed in major units, so pricing needs both the
+      // currency and the field definitions to convert it exactly once.
+      currency: org.base_currency,
+      fields: fields as unknown as PricingField[],
     }));
   } catch (err) {
     if (err instanceof PricingError) return apiErr(err.message, 422);

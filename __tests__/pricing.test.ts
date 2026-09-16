@@ -43,13 +43,27 @@ describe("pricing", () => {
   });
 
   describe("quantity_rate", () => {
-    const config = { quantity_field: "weight_kg", rate_field: "rate_per_kg_minor" };
+    /**
+     * The rate now lives in a `money` field and is typed in MAJOR units, so
+     * every case here carries the field definitions and a currency. That is
+     * the contract, not ceremony: read from a plain `number` the same 42 could
+     * mean 42 rupees or 42 paise, and this engine used to assume paise — which
+     * billed a scrap yard a hundredfold short. See migration 0019.
+     */
+    const config = { quantity_field: "weight_kg", rate_field: "rate_per_kg" };
+    const fields = [
+      { key: "weight_kg", field_type: "number" },
+      { key: "rate_per_kg", field_type: "money" },
+    ];
+    const ctx = { fields, currency: "INR" };
 
     it("multiplies a field by a field", () => {
+      // 500 kg at ₹42.00 is ₹21,000.00.
       const r = computeAmount({
         strategy: "quantity_rate",
         config,
-        details: { weight_kg: 500, rate_per_kg_minor: 4200 },
+        details: { weight_kg: 500, rate_per_kg: 42 },
+        ...ctx,
       });
       expect(r.amountMinor).toBe(2100000);
       expect(r.explanation).toBe("500 × 4200 minor units");
@@ -65,10 +79,12 @@ describe("pricing", () => {
     });
 
     it("handles a fractional quantity and still returns whole minor units", () => {
+      // 2.5 kg at ₹3.33 is ₹8.325, which is not a payable amount.
       const r = computeAmount({
         strategy: "quantity_rate",
         config,
-        details: { weight_kg: 2.5, rate_per_kg_minor: 333 },
+        details: { weight_kg: 2.5, rate_per_kg: 3.33 },
+        ...ctx,
       });
       expect(r.amountMinor).toBe(833); // 832.5 → 833
       expect(Number.isInteger(r.amountMinor)).toBe(true);
@@ -78,29 +94,30 @@ describe("pricing", () => {
       const r = computeAmount({
         strategy: "quantity_rate",
         config,
-        details: { weight_kg: "500", rate_per_kg_minor: "4200" },
+        details: { weight_kg: "500", rate_per_kg: "42" },
+        ...ctx,
       });
       expect(r.amountMinor).toBe(2100000);
     });
 
     it("says which field is missing rather than returning zero", () => {
       expect(() =>
-        computeAmount({ strategy: "quantity_rate", config, details: { weight_kg: 500 } }),
-      ).toThrow(/rate_per_kg_minor is needed/);
+        computeAmount({ strategy: "quantity_rate", config, details: { weight_kg: 500 }, ...ctx }),
+      ).toThrow(/rate_per_kg is needed/);
     });
 
     it("rejects a non-numeric value", () => {
       expect(() =>
-        computeAmount({ strategy: "quantity_rate", config, details: { weight_kg: "heavy", rate_per_kg_minor: 10 } }),
+        computeAmount({ strategy: "quantity_rate", config, details: { weight_kg: "heavy", rate_per_kg: 10 }, ...ctx }),
       ).toThrow(/weight_kg is needed/);
     });
 
     it("rejects negatives on either side", () => {
       expect(() =>
-        computeAmount({ strategy: "quantity_rate", config, details: { weight_kg: -1, rate_per_kg_minor: 10 } }),
+        computeAmount({ strategy: "quantity_rate", config, details: { weight_kg: -1, rate_per_kg: 10 }, ...ctx }),
       ).toThrow(/cannot be negative/);
       expect(() =>
-        computeAmount({ strategy: "quantity_rate", config, details: { weight_kg: 1, rate_per_kg_minor: -10 } }),
+        computeAmount({ strategy: "quantity_rate", config, details: { weight_kg: 1, rate_per_kg: -10 }, ...ctx }),
       ).toThrow(/cannot be negative/);
     });
 
@@ -113,11 +130,41 @@ describe("pricing", () => {
       ).toThrow(/neither a rate field nor a fixed rate/);
     });
 
+    it("refuses a rate field that is not an amount, rather than guessing its unit", () => {
+      // The whole point. A `number` rate of 42 could be 42 or 0.42, and this
+      // engine used to silently choose 0.42.
+      expect(() =>
+        computeAmount({
+          strategy: "quantity_rate",
+          config,
+          details: { weight_kg: 500, rate_per_kg: 42 },
+          currency: "INR",
+          fields: [
+            { key: "weight_kg", field_type: "number" },
+            { key: "rate_per_kg", field_type: "number" },
+          ],
+        }),
+      ).toThrow(/must be an amount field, not a number/);
+    });
+
+    it("prices a scrap yard's load the way the scrap yard would", () => {
+      // The case that found the bug: 1,840 kg at 22 a kilo. Read as minor
+      // units that came to 40,480 minor — 404.80 — instead of 40,480.
+      const r = computeAmount({
+        strategy: "quantity_rate",
+        config,
+        details: { weight_kg: 1840, rate_per_kg: 22 },
+        ...ctx,
+      });
+      expect(r.amountMinor).toBe(4048000);
+    });
+
     it("a zero quantity is a legitimate zero, not an error", () => {
       const r = computeAmount({
         strategy: "quantity_rate",
         config,
-        details: { weight_kg: 0, rate_per_kg_minor: 4200 },
+        details: { weight_kg: 0, rate_per_kg: 42 },
+        ...ctx,
       });
       expect(r.amountMinor).toBe(0);
     });

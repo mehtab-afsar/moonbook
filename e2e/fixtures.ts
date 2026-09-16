@@ -20,7 +20,7 @@ export interface TenantOptions {
   /** Defaults to India + split-rate GST — the shape most specs want. */
   country?: "IN" | "GB" | "AE" | "US";
   regionCode?: string | null;
-  templateKey?: "freight" | "generic";
+  templateKey?: "freight" | "scrap" | "hospitality" | "wholesale" | "generic";
   taxId?: string | null;
   label?: string;
 }

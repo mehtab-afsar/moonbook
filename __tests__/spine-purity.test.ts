@@ -37,6 +37,11 @@ const ALLOWED = [
   // date. The trigger reads `details` to check its SHAPE and never its value
   // for any financial purpose — the same standing exception as 0010.
   "20260916000018_date_fields_must_be_dates.sql",
+  // The same trigger again, superseded for the `money` field type.
+  "20260916000019_money_field_type.sql",
+  // issue_document again, for line ordering. Carries the printable_details
+  // lateral join forward unchanged.
+  "20260916000021_line_order.sql",
 ];
 
 /** Every `create [or replace] view ... as <body>;` in the migrations. */

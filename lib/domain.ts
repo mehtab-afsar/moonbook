@@ -67,10 +67,21 @@ export const PAYMENT_METHODS = ["cash", "bank", "card", "online", "cheque"] as c
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 /**
- * Six field types, not eleven. Each one costs five surfaces: a form widget, a
- * zod branch, a PDF renderer, a filter control and a trigger branch.
+ * Seven field types, not eleven. Each costs five surfaces: a form widget, a
+ * zod branch, a PDF renderer, a filter control and a trigger branch, so the
+ * bar for a new one is high.
+ *
+ * `money` cleared it. A rate per kilo entered as `22` in a plain `number`
+ * field is ambiguous — rupees or paise — and the pricing engine read it as
+ * paise, so a scrap yard's 1,840 kg at ₹22 billed as ₹404.80 instead of
+ * ₹40,480. A hundredfold error, silent, on every invoice. `number` cannot
+ * carry that meaning and no amount of documentation makes it.
+ *
+ * A `money` field holds the amount AS TYPED, in major units, and the pricing
+ * engine converts it with the organisation's currency. Storing minor units
+ * instead would print "2200" on the invoice where the reader expects 22.
  */
-export const FIELD_TYPES = ["text", "long_text", "number", "date", "select", "boolean"] as const;
+export const FIELD_TYPES = ["text", "long_text", "number", "money", "date", "select", "boolean"] as const;
 export type FieldType = (typeof FIELD_TYPES)[number];
 
 export const PRICING_STRATEGIES = ["manual", "flat", "quantity_rate"] as const;

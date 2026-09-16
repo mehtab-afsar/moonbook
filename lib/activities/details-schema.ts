@@ -15,7 +15,8 @@ import { z } from "zod";
  * industry adds rows to activity_fields and zero lines here.
  */
 
-export type FieldType = "text" | "long_text" | "number" | "date" | "select" | "boolean";
+export type FieldType =
+  | "text" | "long_text" | "number" | "money" | "date" | "select" | "boolean";
 
 export interface ActivityField {
   key: string;
@@ -36,6 +37,13 @@ function baseFor(field: ActivityField): z.ZodTypeAny {
       return z.string().trim().max(2000, `${field.label} is too long`);
     case "number":
       return z.number({ message: `${field.label} must be a number` }).finite();
+    case "money":
+      // As typed, in major units. Negative money is not a price; an amount
+      // that should reduce a bill is a discount or a credit note.
+      return z
+        .number({ message: `${field.label} must be an amount` })
+        .finite(`${field.label} must be an amount`)
+        .min(0, `${field.label} cannot be negative`);
     case "date":
       return z.string().regex(ISO_DATE, `${field.label} must be a date`);
     case "boolean":
