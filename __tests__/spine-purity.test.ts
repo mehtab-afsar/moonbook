@@ -26,6 +26,10 @@ const ALLOWED = [
   // document snapshot. The one crossing into the document layer, and it
   // crosses as rendered text — read once at issue, never computed on.
   "20260916000013_document_printable_details.sql",
+  // update_activity replaces details wholesale and re-derives the mirrored
+  // reportable field, exactly as record_activity does on the way in. A write
+  // path, never a read one — nothing financial is computed from it here.
+  "20260916000015_update_activity.sql",
 ];
 
 /** Every `create [or replace] view ... as <body>;` in the migrations. */

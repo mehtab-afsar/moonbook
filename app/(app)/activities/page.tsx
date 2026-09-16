@@ -1,18 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { verifyAuth } from "@/lib/auth/verify";
-import { formatMoney } from "@/lib/money";
-import { ActivityForm, type ActivityTypeOption } from "@/features/activities/components/ActivityForm";
+import type { ActivityTypeOption } from "@/features/activities/components/ActivityForm";
+import { ActivityLog, type LogRow } from "@/features/activities/components/ActivityLog";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Activity log" };
-
-const STATUS_STYLE: Record<string, string> = {
-  completed: "bg-settled-tint text-settled-ink",
-  invoiced: "bg-line-soft text-ink-2",
-  pending: "bg-pending-tint text-pending-ink",
-  cancelled: "bg-overdue-tint text-overdue",
-};
 
 export default async function ActivitiesPage() {
   const auth = await verifyAuth();
@@ -46,7 +39,7 @@ export default async function ActivitiesPage() {
       // pin direction and org) and parties by two (party_id and
       // bill_to_party_id). Unnamed, either is an ambiguous-embed ERROR.
       .select(
-        "id, occurred_on, amount_minor, currency, reference, status, dim1_key, dim1_value, activity_types!activities_activity_type_id_fkey(label_singular), parties!activities_party_id_fkey(name)",
+        "id, activity_type_id, party_id, occurred_on, amount_minor, currency, reference, status, details, dim1_key, dim1_value, activity_types!activities_activity_type_id_fkey(label_singular), parties!activities_party_id_fkey(name)",
       )
       .order("occurred_on", { ascending: false })
       .limit(100),
@@ -60,6 +53,30 @@ export default async function ActivitiesPage() {
   const currency = org?.base_currency ?? "USD";
   const locale = org?.locale ?? "en";
 
+  const rows: LogRow[] = (activities ?? []).map((a) => {
+    const row = a as unknown as {
+      id: string; activity_type_id: string; party_id: string; occurred_on: string;
+      amount_minor: number; currency: string; reference: string | null; status: string;
+      details: Record<string, unknown> | null; dim1_value: string | null;
+      activity_types: { label_singular: string } | null;
+      parties: { name: string } | null;
+    };
+    return {
+      id: row.id,
+      activity_type_id: row.activity_type_id,
+      party_id: row.party_id,
+      occurred_on: row.occurred_on,
+      reference: row.reference,
+      amount_minor: row.amount_minor,
+      status: row.status as LogRow["status"],
+      details: row.details ?? {},
+      currency: row.currency,
+      type_label: row.activity_types?.label_singular ?? "—",
+      party_name: row.parties?.name ?? "—",
+      dim1_value: row.dim1_value,
+    };
+  });
+
   return (
     <div className="space-y-6 p-8">
       <header>
@@ -70,61 +87,13 @@ export default async function ActivitiesPage() {
         </p>
       </header>
 
-      <ActivityForm
+      <ActivityLog
         types={(types ?? []) as unknown as ActivityTypeOption[]}
         parties={parties ?? []}
+        rows={rows}
         currency={currency}
         locale={locale}
       />
-
-      <div className="overflow-x-auto rounded-[10px] border border-line bg-white">
-        <table className="w-full text-left text-[13.5px]">
-          <thead>
-            <tr className="border-b border-line-soft text-[12px] uppercase tracking-wide text-ink-3">
-              <th className="px-5 py-3 font-medium">Date</th>
-              <th className="px-5 py-3 font-medium">What</th>
-              <th className="px-5 py-3 font-medium">Party</th>
-              <th className="px-5 py-3 font-medium">Reference</th>
-              <th className="px-5 py-3 font-medium">Amount</th>
-              <th className="px-5 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(activities ?? []).length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-ink-3">Nothing recorded yet.</td>
-              </tr>
-            )}
-            {(activities ?? []).map((a) => {
-              const row = a as unknown as {
-                id: string; occurred_on: string; amount_minor: number; currency: string;
-                reference: string | null; status: string; dim1_value: string | null;
-                activity_types: { label_singular: string } | null;
-                parties: { name: string } | null;
-              };
-              return (
-                <tr key={row.id} className="border-b border-line-soft last:border-b-0">
-                  <td className="px-5 py-3 font-mono text-ink-2">{row.occurred_on}</td>
-                  <td className="px-5 py-3 text-ink">
-                    {row.activity_types?.label_singular ?? "—"}
-                    {row.dim1_value && <span className="ml-2 text-ink-3">· {row.dim1_value}</span>}
-                  </td>
-                  <td className="px-5 py-3 font-medium text-ink">{row.parties?.name ?? "—"}</td>
-                  <td className="px-5 py-3 font-mono text-ink-2">{row.reference ?? "—"}</td>
-                  <td className="px-5 py-3 font-mono text-ink">
-                    {formatMoney(row.amount_minor, row.currency, locale)}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-medium ${STATUS_STYLE[row.status] ?? ""}`}>
-                      {row.status}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 }

@@ -1319,6 +1319,23 @@ export type Database = {
         Returns: string
       }
       has_role: { Args: { p_roles: string[] }; Returns: boolean }
+      issue_credit_note: {
+        Args: {
+          p_doc_date?: string
+          p_document_id: string
+          p_lines?: Json
+          p_notes?: string
+          p_reason: string
+          p_taxable_value_minor: number
+          p_taxes?: Json
+          p_total_minor: number
+        }
+        Returns: {
+          applied_minor: number
+          doc_no: string
+          document_id: string
+        }[]
+      }
       issue_document: {
         Args: {
           p_activity_ids?: string[]
@@ -1391,6 +1408,25 @@ export type Database = {
         }
         Returns: {
           payment_id: string
+        }[]
+      }
+      update_activity: {
+        Args: {
+          p_activity_id: string
+          p_amount_minor: number
+          p_bill_to_party_id?: string
+          p_details?: Json
+          p_direct_cost_minor?: number
+          p_notes?: string
+          p_occurred_on: string
+          p_party_id: string
+          p_period_end?: string
+          p_period_start?: string
+          p_reference?: string
+          p_status?: string
+        }
+        Returns: {
+          activity_id: string
         }[]
       }
     }

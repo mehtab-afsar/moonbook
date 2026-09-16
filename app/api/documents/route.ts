@@ -7,6 +7,7 @@ import { apiErr, apiOk } from "@/lib/api/response";
 import { rpcError } from "@/lib/api/errors";
 import { addMinor } from "@/lib/money";
 import { computeTax, type TaxRegime, type TaxTreatment } from "@/lib/tax";
+import { BILLABLE_DOC_KINDS, TAX_TREATMENTS } from "@/lib/domain";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,10 @@ export async function GET() {
 }
 
 const issueSchema = z.object({
-  doc_kind: z.enum(["invoice", "bill"]).default("invoice"),
+  // Only the two BILLABLE kinds. A credit or debit note is not raised
+  // here — it offsets an existing document, and issue_credit_note is the
+  // path that knows how to point it at one.
+  doc_kind: z.enum(BILLABLE_DOC_KINDS).default("invoice"),
   counterparty_id: z.uuid(),
   doc_date: z.iso.date(),
   due_date: z.iso.date().optional().nullable(),
@@ -48,7 +52,7 @@ const issueSchema = z.object({
       }),
     )
     .default([]),
-  tax_treatment: z.enum(["forward", "reverse_charge", "exempt"]).default("forward"),
+  tax_treatment: z.enum(TAX_TREATMENTS).default("forward"),
   /** Overrides the organisation's default rate for this one document. */
   tax_rate_pct: z.number().min(0).max(100).optional(),
   ship_to_party_id: z.uuid().optional().nullable(),

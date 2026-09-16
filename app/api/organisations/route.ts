@@ -6,6 +6,7 @@ import { apiErr, apiOk } from "@/lib/api/response";
 import { rpcError } from "@/lib/api/errors";
 import { isSupportedCurrency } from "@/lib/money";
 import { log } from "@/lib/logger";
+import { TAX_REGIMES } from "@/lib/domain";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,7 @@ const createOrganisationSchema = z.object({
   locale: z.string().trim().min(2).max(35).default("en"),
   timezone: z.string().trim().min(1).max(64).default("UTC"),
   fiscal_year_start_month: z.number().int().min(1).max(12).default(1),
-  tax_regime: z.enum(["none", "single_rate", "split_rate"]).default("none"),
+  tax_regime: z.enum(TAX_REGIMES).default("none"),
   default_tax_rate_pct: z.number().min(0).max(100).default(0),
   tax_id: z.string().trim().max(40).optional().nullable(),
   tax_id_kind: z.string().trim().max(20).optional().nullable(),

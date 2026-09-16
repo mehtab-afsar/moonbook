@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
 import { computeAmount, PricingError } from "@/lib/pricing";
-import { formatMoney, toMinor } from "@/lib/money";
+import { formatMoney, fromMinor, toMinor } from "@/lib/money";
 import type { ActivityField } from "@/lib/activities/details-schema";
 
 /**
@@ -15,6 +15,18 @@ import type { ActivityField } from "@/lib/activities/details-schema";
  *
  * Adding an industry adds rows to activity_fields. Nothing here changes.
  */
+/** An existing activity, loaded into the form to be corrected. */
+export interface EditableActivity {
+  id: string;
+  activity_type_id: string;
+  party_id: string;
+  occurred_on: string;
+  reference: string | null;
+  amount_minor: number;
+  status: "pending" | "completed" | "cancelled";
+  details: Record<string, unknown>;
+}
+
 export interface ActivityTypeOption {
   id: string;
   label_singular: string;
@@ -29,19 +41,31 @@ export function ActivityForm({
   parties,
   currency,
   locale,
+  editing,
+  onDone,
 }: {
   types: ActivityTypeOption[];
   parties: { id: string; name: string }[];
   currency: string;
   locale: string;
+  /** Present when correcting an existing activity rather than recording one. */
+  editing?: EditableActivity;
+  onDone?: () => void;
 }) {
   const router = useRouter();
-  const [typeId, setTypeId] = useState(types[0]?.id ?? "");
-  const [partyId, setPartyId] = useState("");
-  const [occurredOn, setOccurredOn] = useState(new Date().toISOString().slice(0, 10));
-  const [reference, setReference] = useState("");
-  const [manualAmount, setManualAmount] = useState("");
-  const [details, setDetails] = useState<Record<string, unknown>>({});
+  // The activity TYPE is fixed once recorded: `details` is validated against
+  // that type's field schema and `direction` is pinned to it by a composite
+  // foreign key, so changing it here would produce a row the database refuses.
+  const [typeId, setTypeId] = useState(editing?.activity_type_id ?? types[0]?.id ?? "");
+  const [partyId, setPartyId] = useState(editing?.party_id ?? "");
+  const [occurredOn, setOccurredOn] = useState(
+    editing?.occurred_on ?? new Date().toISOString().slice(0, 10),
+  );
+  const [reference, setReference] = useState(editing?.reference ?? "");
+  const [manualAmount, setManualAmount] = useState(
+    editing ? String(fromMinor(editing.amount_minor, currency)) : "",
+  );
+  const [details, setDetails] = useState<Record<string, unknown>>(editing?.details ?? {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -76,28 +100,37 @@ export function ActivityForm({
     setSaving(true);
     setError("");
 
-    const res = await fetch("/api/activities", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        activity_type_id: typeId,
-        party_id: partyId,
-        occurred_on: occurredOn,
-        reference: reference || null,
-        details,
-        amount_minor: manualAmount ? toMinor(Number(manualAmount), currency) : undefined,
-      }),
-    });
+    // A correction PATCHes the whole row; update_activity takes a full
+    // replacement, so that a nullable field can be cleared as well as set.
+    const res = await fetch(
+      editing ? `/api/activities/${editing.id}` : "/api/activities",
+      {
+        method: editing ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(editing ? {} : { activity_type_id: typeId }),
+          party_id: partyId,
+          occurred_on: occurredOn,
+          reference: reference || null,
+          details,
+          amount_minor: manualAmount ? toMinor(Number(manualAmount), currency) : undefined,
+          ...(editing ? { status: editing.status } : {}),
+        }),
+      },
+    );
     const body = await res.json();
     setSaving(false);
 
     if (!res.ok) {
-      setError(body.error ?? "Could not record this.");
+      setError(body.error ?? (editing ? "Could not save this correction." : "Could not record this."));
       return;
     }
-    setDetails({});
-    setReference("");
-    setManualAmount("");
+    if (!editing) {
+      setDetails({});
+      setReference("");
+      setManualAmount("");
+    }
+    onDone?.();
     router.refresh();
   }
 
@@ -117,6 +150,7 @@ export function ActivityForm({
           <select
             id="type"
             value={typeId}
+            disabled={Boolean(editing)}
             onChange={(e) => {
               setTypeId(e.target.value);
               setDetails({}); // a different type means a different shape
@@ -192,8 +226,13 @@ export function ActivityForm({
           )}
         </p>
         <button type="submit" disabled={saving} className={buttonPrimaryClass}>
-          {saving ? "Saving…" : "Record"}
+          {saving ? "Saving…" : editing ? "Save correction" : "Record"}
         </button>
+        {onDone && (
+          <button type="button" onClick={onDone} className="text-[13.5px] text-ink-2 hover:text-ink">
+            Cancel
+          </button>
+        )}
       </div>
 
       {error && <p className="rounded-md bg-overdue-tint p-3 text-[13px] text-overdue">{error}</p>}

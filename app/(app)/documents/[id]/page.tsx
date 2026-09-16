@@ -6,6 +6,7 @@ import { formatMoney } from "@/lib/money";
 import { attachBalances, settlementLabel } from "@/lib/documents/with-balances";
 import { parseSnapshot } from "@/lib/pdf/snapshot";
 import { RecordPaymentForm } from "@/features/documents/components/RecordPaymentForm";
+import { DocumentActions, type HeldCredit } from "@/features/documents/components/DocumentActions";
 import { buttonSecondaryClass } from "@/lib/ui/styles";
 
 export const dynamic = "force-dynamic";
@@ -44,15 +45,32 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   // never a 403 — a 403 would confirm it exists.
   if (!doc) notFound();
 
-  const [{ data: org }, withBalance, { data: allocations }] = await Promise.all([
-    supabase.from("organisations").select("locale, timezone").eq("id", auth.ctx.orgId).single(),
-    attachBalances(supabase, [doc]),
-    supabase
-      .from("allocations")
-      .select("id, amount_minor, created_at, payments!allocations_payment_id_fkey(paid_on, method, reference_no)")
-      .eq("target_document_id", id)
-      .order("created_at"),
-  ]);
+  const [{ data: org }, withBalance, { data: allocations }, { data: openPayments }, { data: openCredits }] =
+    await Promise.all([
+      supabase.from("organisations").select("locale, timezone").eq("id", auth.ctx.orgId).single(),
+      attachBalances(supabase, [doc]),
+      supabase
+        .from("allocations")
+        .select("id, amount_minor, created_at, payments!allocations_payment_id_fkey(paid_on, method, reference_no)")
+        .eq("target_document_id", id)
+        .order("created_at"),
+      // Money in the book with somewhere left to go. Both are views, so both
+      // are fetched separately rather than embedded — see CONVENTIONS.md §9.
+      supabase
+        .from("payment_balances")
+        .select("payment_id, party_id, paid_on, unapplied_minor")
+        .eq("party_id", doc.counterparty_id)
+        .gt("unapplied_minor", 0)
+        .order("paid_on"),
+      supabase
+        .from("credit_balances")
+        .select("document_id, counterparty_id, doc_no, unapplied_minor")
+        .eq("counterparty_id", doc.counterparty_id)
+        .gt("unapplied_minor", 0)
+        // credit_balances carries no date — the number is issued in date
+        // order within a series, so it sorts the same way.
+        .order("doc_no"),
+    ]);
 
   const balance = withBalance[0]?.balance ?? null;
   const locale = org?.locale ?? "en";
@@ -66,6 +84,28 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
   const overdue =
     balance !== null && balance.balance_due_minor > 0 && doc.due_date !== null && doc.due_date < today;
+
+  // What this customer has already paid or been credited that is still
+  // unspent — offered against this document rather than left stranded.
+  const heldCredit: HeldCredit[] = [
+    ...(openPayments ?? []).map((p) => ({
+      id: p.payment_id as string,
+      kind: "payment" as const,
+      label: `Payment of ${p.paid_on}`,
+      available_minor: p.unapplied_minor ?? 0,
+    })),
+    ...(openCredits ?? [])
+      // A note cannot be applied to the document it was raised against twice
+      // over, but it can be applied to a different one — so only this
+      // document's own note is excluded.
+      .filter((c) => c.document_id !== doc.id)
+      .map((c) => ({
+        id: c.document_id as string,
+        kind: "credit_note" as const,
+        label: `Credit note ${c.doc_no ?? ""}`.trim(),
+        available_minor: c.unapplied_minor ?? 0,
+      })),
+  ];
 
   return (
     <div className="max-w-[900px] space-y-6 p-8">
@@ -202,6 +242,23 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
                 />
               )}
           </section>
+
+          {/* Only for invoices and bills. A credit note is a source of an
+              offset, never a target of one, so it has nothing to cancel
+              against and nothing to apply to it. */}
+          {(doc.doc_kind === "invoice" || doc.doc_kind === "bill") && (
+            <DocumentActions
+              documentId={doc.id}
+              currency={doc.currency}
+              locale={locale}
+              balanceMinor={balance?.balance_due_minor ?? 0}
+              appliedMinor={(balance?.settled_minor ?? 0) + (balance?.credited_minor ?? 0)}
+              totalMinor={snapshot.document.total_minor}
+              status={doc.status}
+              isOwner={auth.ctx.role === "owner"}
+              heldCredit={heldCredit}
+            />
+          )}
         </>
       )}
     </div>

@@ -5,6 +5,7 @@ import { verifyAuth } from "@/lib/auth/verify";
 import { parseBody } from "@/lib/api/validate";
 import { apiErr, apiOk } from "@/lib/api/response";
 import { rpcError } from "@/lib/api/errors";
+import { PAYMENT_DIRECTIONS, PAYMENT_METHODS } from "@/lib/domain";
 
 export const runtime = "nodejs";
 
@@ -24,11 +25,11 @@ export async function GET() {
 }
 
 const paymentSchema = z.object({
-  direction: z.enum(["in", "out"]).default("in"),
+  direction: z.enum(PAYMENT_DIRECTIONS).default("in"),
   party_id: z.uuid(),
   amount_minor: z.number().int().positive(),
   paid_on: z.iso.date(),
-  method: z.enum(["cash", "bank", "card", "online", "cheque"]),
+  method: z.enum(PAYMENT_METHODS),
   reference_no: z.string().trim().max(100).optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
   /** Anything left unallocated stays visible as unapplied rather than forced. */
