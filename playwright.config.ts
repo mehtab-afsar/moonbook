@@ -46,7 +46,11 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "npm run dev",
+    // In CI a production build already exists, so serve that: `next dev`
+    // compiles each route on first request, which across 55 tests is minutes
+    // of waiting for work the build step has already done. Locally `dev` is
+    // right, because the alternative is rebuilding after every edit.
+    command: process.env.CI ? "npm run start" : "npm run dev",
     url: APP,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

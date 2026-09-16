@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A superseded run tells you nothing you want to know. Cancel it and keep the
+# newest, except on main where every commit's result is worth having.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  # ── The fast half. No Docker, no database, no network. ────────────────────
+  # These are the guards that read supabase/migrations/*.sql and run regex, so
+  # they cost seconds and answer the questions that matter most: is a policy
+  # missing, is a migration non-idempotent, has a closed set drifted between
+  # SQL and TypeScript. Kept in their own job so a failure here is reported in
+  # under a minute rather than behind a Supabase boot.
+  checks:
+    name: types, lint and guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Guards
+        run: npm test
+
+  # ── The slow half. A real database, a real browser. ───────────────────────
+  e2e:
+    name: end to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        run: supabase start
+
+      # Written rather than hardcoded. The local stack's keys are the published
+      # demo defaults today, but pinning them here would mean a CLI release
+      # that rotates them fails as a mysterious auth error instead of not at
+      # all. `supabase status -o env` is the source either way.
+      - name: Write .env.local from the running stack
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=${API_URL}"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${ANON_KEY}"
+            echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}"
+            echo "SUPABASE_DB_URL=${DB_URL}"
+            echo "NEXT_PUBLIC_APP_URL=http://localhost:3000"
+            echo "MAILPIT_URL=${MAILPIT_URL}"
+          } > .env.local
+
+      # Every migration applied from nothing. This is also what proves they are
+      # idempotent in practice rather than only by regex.
+      - name: Apply migrations
+        run: supabase db reset
+
+      # The generated types are committed, so a schema change that was not
+      # regenerated is a real drift and should fail here rather than surface as
+      # a confusing type error on someone's branch.
+      - name: Check generated types are current
+        run: |
+          set -euo pipefail
+          npm run db:types
+          if ! git diff --quiet -- types/supabase.ts; then
+            echo "::error file=types/supabase.ts::types/supabase.ts is stale — run 'npm run db:types' and commit the result"
+            git --no-pager diff --stat -- types/supabase.ts
+            exit 1
+          fi
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      # Built before the tests so playwright.config.ts can serve it with
+      # `next start` instead of compiling each route on first request.
+      - name: Build
+        run: npm run build
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
