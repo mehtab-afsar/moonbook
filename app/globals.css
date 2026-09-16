@@ -1,0 +1,281 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   shadcn's variables, mapped onto the Moonbook palette.
+
+   Chrome is monochrome; ink is the action colour (every primary button, every
+   active nav item) and the brand blue is the signal colour — links, focus
+   rings, and the one place a figure is meant to draw the eye. Status colour is
+   reserved for document and payment state and appears nowhere else.
+
+   Deliberately distinct from its siblings: LogiFlow is indigo-navy, LedgerFlow
+   is teal. Moonbook is a midnight navy ink with a periwinkle accent, so
+   someone working across all three never has to wonder which one they're in.
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --background: #ffffff;
+  --foreground: #171a2e;
+  --card: #ffffff;
+  --card-foreground: #171a2e;
+  --popover: #ffffff;
+  --popover-foreground: #171a2e;
+
+  --primary: #171a2e;
+  --primary-foreground: #ffffff;
+
+  --secondary: #eef0f6;
+  --secondary-foreground: #171a2e;
+  --muted: #f7f8fb;
+  --muted-foreground: #6b7091;
+  --accent: #eaecfd;
+  --accent-foreground: #4c5fd7;
+
+  --destructive: #b42318;
+
+  --border: #e0e2ec;
+  --input: #e0e2ec;
+  --ring: #4c5fd7;
+
+  --radius: 0.375rem;
+  --radius-doc: 0.25rem;
+  --radius-card: 0.625rem;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #171a2e;
+  --sidebar-primary: #171a2e;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaecfd;
+  --sidebar-accent-foreground: #4c5fd7;
+  --sidebar-border: #e0e2ec;
+  --sidebar-ring: #4c5fd7;
+}
+
+/* No dark theme. An invoice is a printed document and the PDF is the
+   reference; a dark office app would not match anything it produces. */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer base {
+  /* Every figure compared against the one above it — document numbers,
+     amounts, tax identifiers, dates — gets tabular figures so a column
+     scans cleanly. */
+  .font-mono,
+  .tabular,
+  table td,
+  table th {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+}
+
+@layer components {
+  .row-dense { height: 2.75rem; }
+}
+
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Semantic tokens — the set the app actually writes in class names.
+
+   Status names are deliberately semantic rather than colour names
+   (`settled`, not `forest`): Moonbook serves many industries and the same
+   state is called different things in each, so the token should name the
+   meaning and let the label name the industry.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@theme {
+  --color-paper: #f7f8fb;
+  --color-ink: #171a2e;
+  --color-ink-2: #3c415c;
+  --color-ink-3: #6b7091;
+  --color-line: #e0e2ec;
+  --color-line-soft: #eef0f6;
+
+  --color-brand: #4c5fd7;
+  --color-brand-hover: #3a4ac0;
+  --color-brand-tint: #eaecfd;
+
+  /* Settled — nothing outstanding. */
+  --color-settled: #16794a;
+  --color-settled-tint: #e3f3ea;
+  --color-settled-ink: #115c38;
+
+  /* Pending — partially settled, or due soon. */
+  --color-pending: #c98a00;
+  --color-pending-tint: #fff4d6;
+  --color-pending-ink: #7a5300;
+
+  /* Overdue — past its due date, and destructive actions. */
+  --color-overdue: #b42318;
+  --color-overdue-tint: #fdecea;
+
+  /* Disputed — deliberately far from the brand blue so it can never read as
+     an accent. */
+  --color-disputed: #b0367a;
+  --color-disputed-tint: #fdeaf3;
+  --color-disputed-ink: #8a2560;
+}
+
+@layer base {
+  button,
+  a,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    transition:
+      background-color 150ms ease-out,
+      border-color 150ms ease-out,
+      color 150ms ease-out,
+      box-shadow 150ms ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * Suspense-reveal handoff: a loading.tsx skeleton (exit="slide-down") yields
+ * to the real page content (enter="slide-up") instead of an instant swap.
+ * No-ops without browser support for the View Transitions API; respects
+ * prefers-reduced-motion via the block above (transition-duration applies to
+ * ::view-transition-* pseudo-elements too).
+ */
+:root {
+  --duration-exit: 150ms;
+  --duration-enter: 210ms;
+  --duration-move: 400ms;
+}
+
+::view-transition-old(.slide-down) {
+  animation:
+    var(--duration-exit) ease-out both vt-fade reverse,
+    var(--duration-exit) ease-out both vt-slide-y reverse;
+}
+::view-transition-new(.slide-up) {
+  animation:
+    var(--duration-enter) ease-in var(--duration-exit) both vt-fade,
+    var(--duration-move) ease-in both vt-slide-y;
+}
+
+@keyframes vt-fade {
+  from {
+    filter: blur(3px);
+    opacity: 0;
+  }
+  to {
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+@keyframes vt-slide-y {
+  from {
+    transform: translateY(10px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/*
+ * Directional nav slide: list -> detail pages tag their Link with
+ * transitionTypes={['nav-forward']}, detail -> list "back" links use
+ * ['nav-back']. Scoped to that one genuinely hierarchical relationship rather
+ * than applied app-wide — lateral sidebar switches between unrelated sections
+ * aren't "forward"/"back" in any real sense.
+ */
+::view-transition-old(.nav-forward) {
+  --slide-offset: -60px;
+  animation:
+    150ms ease-in both vt-fade reverse,
+    400ms ease-in-out both vt-slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --slide-offset: 60px;
+  animation:
+    210ms ease-out 150ms both vt-fade,
+    400ms ease-in-out both vt-slide;
+}
+
+::view-transition-old(.nav-back) {
+  --slide-offset: 60px;
+  animation:
+    150ms ease-in both vt-fade reverse,
+    400ms ease-in-out both vt-slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --slide-offset: -60px;
+  animation:
+    210ms ease-out 150ms both vt-fade,
+    400ms ease-in-out both vt-slide;
+}
+
+@keyframes vt-slide {
+  from {
+    translate: var(--slide-offset);
+  }
+  to {
+    translate: 0;
+  }
+}
