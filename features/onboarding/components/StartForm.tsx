@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Truck, Recycle, Coffee, Package, Sparkles, type LucideIcon } from "lucide-react";
 import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
+import { StepBadge } from "./StepBadge";
+
+const TEMPLATE_ICON: Record<string, LucideIcon> = {
+  freight: Truck,
+  scrap: Recycle,
+  hospitality: Coffee,
+  wholesale: Package,
+};
 
 /**
  * Organisation setup: four questions, and the one that matters most is "what
@@ -79,14 +88,17 @@ export function StartForm({ templates }: { templates: IndustryTemplate[] }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-5">
-      <h1 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.01em] text-ink">
-        Let&apos;s set up your business.
-      </h1>
-      <p className="max-w-[52ch] text-[14px] leading-[1.55] text-ink-2">
-        A few questions. Everything else follows from your answers, and all of it can be
-        changed later.
-      </p>
+    <form onSubmit={submit} className="space-y-6">
+      <div>
+        <StepBadge current={2} total={2} />
+        <h1 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.01em] text-ink">
+          Let&apos;s set up your business.
+        </h1>
+        <p className="mt-2 max-w-[52ch] text-[14px] leading-[1.55] text-ink-2">
+          A few questions. Everything else follows from your answers, and all of it can be
+          changed later.
+        </p>
+      </div>
 
       <div>
         <label htmlFor="name" className="mb-1.5 block text-[13px] font-medium text-ink">
@@ -97,77 +109,90 @@ export function StartForm({ templates }: { templates: IndustryTemplate[] }) {
 
       <div>
         <span className="mb-1.5 block text-[13px] font-medium text-ink">What kind of business is this?</span>
-        <div className="space-y-2">
-          {templates.map((t) => (
-            <label
-              key={t.key}
-              className={`flex cursor-pointer gap-3 rounded-md border p-3.5 transition-colors duration-150 ${
-                templateKey === t.key ? "border-brand bg-brand-tint" : "border-line bg-white hover:border-ink-3"
-              }`}
-            >
-              <input
-                type="radio"
-                name="template"
-                value={t.key}
-                checked={templateKey === t.key}
-                onChange={() => setTemplateKey(t.key)}
-                className="mt-0.5 size-4 shrink-0 accent-brand"
-              />
-              <span>
-                <span className="block text-[14px] font-medium text-ink">{t.label}</span>
-                <span className="mt-0.5 block text-[12.5px] leading-[1.5] text-ink-2">{t.description}</span>
-              </span>
-            </label>
-          ))}
+        <div className="grid gap-2.5 min-[520px]:grid-cols-2">
+          {templates.map((t) => {
+            const Icon = TEMPLATE_ICON[t.key] ?? Sparkles;
+            const active = templateKey === t.key;
+            return (
+              <label
+                key={t.key}
+                className={`flex cursor-pointer gap-3 rounded-[10px] border p-3.5 transition-colors duration-150 ${
+                  active ? "border-brand bg-brand-tint" : "border-line bg-white hover:border-ink-3"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="template"
+                  value={t.key}
+                  checked={active}
+                  onChange={() => setTemplateKey(t.key)}
+                  className="sr-only"
+                />
+                <span
+                  className={`flex size-8 shrink-0 items-center justify-center rounded-md ${
+                    active ? "bg-brand text-white" : "bg-line-soft text-ink-2"
+                  }`}
+                >
+                  <Icon className="size-4" strokeWidth={1.75} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[14px] font-medium text-ink">{t.label}</span>
+                  <span className="mt-0.5 block text-[12.5px] leading-[1.5] text-ink-2">{t.description}</span>
+                </span>
+              </label>
+            );
+          })}
         </div>
-        <p className="mt-1.5 text-[12.5px] text-ink-3">
+        <p className="mt-2 text-[12.5px] text-ink-3">
           Sets up what you record against each job. You can change any of it later.
         </p>
       </div>
 
-      <div>
-        <label htmlFor="country" className="mb-1.5 block text-[13px] font-medium text-ink">
-          Country
-        </label>
-        <select id="country" value={country} onChange={(e) => setCountry(e.target.value)} className={inputClass}>
-          {Object.entries(COUNTRY_DEFAULTS).map(([code, c]) => (
-            <option key={code} value={code}>{c.label}</option>
-          ))}
-        </select>
-        <p className="mt-1.5 text-[12.5px] text-ink-3">
-          Sets your currency to {d.currency}, your financial year to start in month {d.fyStart}, and your
-          tax to {d.regime === "none" ? "none" : `${d.rate}% ${d.regime === "split_rate" ? "GST" : "VAT"}`}.
-        </p>
-      </div>
-
-      {d.regime === "split_rate" && (
+      <div className="space-y-4 rounded-[10px] border border-line bg-white p-4">
         <div>
-          <label htmlFor="region" className="mb-1.5 block text-[13px] font-medium text-ink">
-            State code
+          <label htmlFor="country" className="mb-1.5 block text-[13px] font-medium text-ink">
+            Country
           </label>
-          <input
-            id="region"
-            value={region}
-            onChange={(e) => setRegion(e.target.value.toUpperCase())}
-            className={`${inputClass} font-mono uppercase`}
-            placeholder="KA"
-          />
+          <select id="country" value={country} onChange={(e) => setCountry(e.target.value)} className={inputClass}>
+            {Object.entries(COUNTRY_DEFAULTS).map(([code, c]) => (
+              <option key={code} value={code}>{c.label}</option>
+            ))}
+          </select>
           <p className="mt-1.5 text-[12.5px] text-ink-3">
-            Decides whether tax splits in two or combines into one on each document.
+            Sets your currency to {d.currency}, your financial year to start in month {d.fyStart}, and your
+            tax to {d.regime === "none" ? "none" : `${d.rate}% ${d.regime === "split_rate" ? "GST" : "VAT"}`}.
           </p>
         </div>
-      )}
 
-      <div>
-        <label htmlFor="taxId" className="mb-1.5 block text-[13px] font-medium text-ink">
-          {d.taxIdKind} <span className="font-normal text-ink-3">(optional)</span>
-        </label>
-        <input
-          id="taxId"
-          value={taxId}
-          onChange={(e) => setTaxId(e.target.value.toUpperCase())}
-          className={`${inputClass} font-mono uppercase`}
-        />
+        {d.regime === "split_rate" && (
+          <div>
+            <label htmlFor="region" className="mb-1.5 block text-[13px] font-medium text-ink">
+              State code
+            </label>
+            <input
+              id="region"
+              value={region}
+              onChange={(e) => setRegion(e.target.value.toUpperCase())}
+              className={`${inputClass} font-mono uppercase`}
+              placeholder="KA"
+            />
+            <p className="mt-1.5 text-[12.5px] text-ink-3">
+              Decides whether tax splits in two or combines into one on each document.
+            </p>
+          </div>
+        )}
+
+        <div>
+          <label htmlFor="taxId" className="mb-1.5 block text-[13px] font-medium text-ink">
+            {d.taxIdKind} <span className="font-normal text-ink-3">(optional)</span>
+          </label>
+          <input
+            id="taxId"
+            value={taxId}
+            onChange={(e) => setTaxId(e.target.value.toUpperCase())}
+            className={`${inputClass} font-mono uppercase`}
+          />
+        </div>
       </div>
 
       {error && <p className="rounded-md bg-overdue-tint p-3 text-[13px] text-overdue">{error}</p>}

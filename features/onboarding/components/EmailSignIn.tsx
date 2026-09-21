@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { StepBadge } from "./StepBadge";
 
 /**
  * The one shared entry point onto every authenticated screen: a magic-link
@@ -13,10 +15,13 @@ export function EmailSignIn({
   next,
   heading,
   reason,
+  step,
 }: {
   next: string;
   heading: string;
   reason: string;
+  /** Only set from /start, where this is the first of two steps. */
+  step?: { current: number; total: number };
 }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -46,7 +51,11 @@ export function EmailSignIn({
   if (status === "sent") {
     return (
       <div>
-        <h1 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.01em] text-ink">
+        {step && <StepBadge current={step.current} total={step.total} />}
+        <span className="flex size-11 items-center justify-center rounded-full bg-brand-tint text-brand">
+          <Mail className="size-5" strokeWidth={1.75} />
+        </span>
+        <h1 className="mt-4 text-[28px] leading-[1.15] font-semibold tracking-[-0.01em] text-ink">
           Check your email.
         </h1>
         <p className="mt-2.5 max-w-[46ch] text-[14px] leading-[1.55] text-ink-2">
@@ -59,6 +68,7 @@ export function EmailSignIn({
 
   return (
     <form onSubmit={submit}>
+      {step && <StepBadge current={step.current} total={step.total} />}
       <h1 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.01em] text-ink">
         {heading}
       </h1>

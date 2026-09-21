@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { postSignInDestination } from "@/lib/auth/post-signin-destination";
 import { EmailSignIn } from "@/features/onboarding/components/EmailSignIn";
+import { SiteHeader } from "@/features/marketing/components/SiteHeader";
 
 export const metadata = { title: "Sign in", robots: { index: false } };
 
@@ -13,11 +14,7 @@ export default async function LoginPage() {
 
   return (
     <div className="min-h-dvh bg-paper text-ink">
-      <header className="border-b border-line bg-paper">
-        <div className="mx-auto flex h-16 max-w-[1120px] items-center px-7">
-          <Link href="/" className="font-semibold text-ink">Moonbook</Link>
-        </div>
-      </header>
+      <SiteHeader />
       <div className="mx-auto max-w-[420px] px-7 py-16">
         <EmailSignIn
           next="/dashboard"
