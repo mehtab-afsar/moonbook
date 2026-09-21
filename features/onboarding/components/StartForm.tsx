@@ -1,17 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Truck, Recycle, Coffee, Package, Sparkles, type LucideIcon } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
 import { StepBadge } from "./StepBadge";
-
-const TEMPLATE_ICON: Record<string, LucideIcon> = {
-  freight: Truck,
-  scrap: Recycle,
-  hospitality: Coffee,
-  wholesale: Package,
-};
 
 /**
  * Organisation setup: four questions, and the one that matters most is "what
@@ -41,7 +34,19 @@ export interface IndustryTemplate {
   description: string;
 }
 
-export function StartForm({ templates }: { templates: IndustryTemplate[] }) {
+export function StartForm({
+  templates,
+  icons,
+}: {
+  templates: IndustryTemplate[];
+  /**
+   * One icon per template key, keyed the same way. Resolved by the caller
+   * (the page, not this component) so this file never has to know what
+   * "freight" or "scrap" is — same reason it reads `templates` from a prop
+   * rather than a hardcoded list.
+   */
+  icons?: Record<string, ReactNode>;
+}) {
   const router = useRouter();
   const [country, setCountry] = useState("IN");
   const [templateKey, setTemplateKey] = useState(templates[0]?.key ?? "generic");
@@ -111,7 +116,6 @@ export function StartForm({ templates }: { templates: IndustryTemplate[] }) {
         <span className="mb-1.5 block text-[13px] font-medium text-ink">What kind of business is this?</span>
         <div className="grid gap-2.5 min-[520px]:grid-cols-2">
           {templates.map((t) => {
-            const Icon = TEMPLATE_ICON[t.key] ?? Sparkles;
             const active = templateKey === t.key;
             return (
               <label
@@ -133,7 +137,7 @@ export function StartForm({ templates }: { templates: IndustryTemplate[] }) {
                     active ? "bg-brand text-white" : "bg-line-soft text-ink-2"
                   }`}
                 >
-                  <Icon className="size-4" strokeWidth={1.75} />
+                  {icons?.[t.key] ?? <Sparkles className="size-4" strokeWidth={1.75} />}
                 </span>
                 <span className="min-w-0">
                   <span className="block text-[14px] font-medium text-ink">{t.label}</span>

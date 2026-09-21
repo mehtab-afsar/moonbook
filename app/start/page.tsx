@@ -1,10 +1,27 @@
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
+import { Truck, Recycle, Coffee, Package } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { EmailSignIn } from "@/features/onboarding/components/EmailSignIn";
 import { StartForm, type IndustryTemplate } from "@/features/onboarding/components/StartForm";
 import { SiteHeader } from "@/features/marketing/components/SiteHeader";
 
 export const metadata = { title: "Get started" };
+
+// Decorative only — which icon goes next to a template's name at the exact
+// point a person picks their industry. Kept here rather than in StartForm
+// (features/) or anywhere under lib/ or app/api: those are the financial
+// core the architecture keeps industry-blind on purpose, and this mapping,
+// unlike theirs, has no bearing on tax, numbering or any document — it is
+// what e2e/industry-fit.spec.ts's source-name guard walks, and correctly
+// does not walk this route.
+const ICON_SIZE = { className: "size-4", strokeWidth: 1.75 } as const;
+const TEMPLATE_ICON: Record<string, ReactNode> = {
+  freight: <Truck {...ICON_SIZE} />,
+  scrap: <Recycle {...ICON_SIZE} />,
+  hospitality: <Coffee {...ICON_SIZE} />,
+  wholesale: <Package {...ICON_SIZE} />,
+};
 
 export default async function StartPage() {
   const supabase = await createClient();
@@ -32,7 +49,7 @@ export default async function StartPage() {
       <SiteHeader />
       <div className="mx-auto max-w-[560px] px-7 py-14">
         {user ? (
-          <StartForm templates={templates} />
+          <StartForm templates={templates} icons={TEMPLATE_ICON} />
         ) : (
           <EmailSignIn
             next="/start"
