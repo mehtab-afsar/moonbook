@@ -34,23 +34,54 @@ export interface PartyOption {
   payment_terms_days: number;
 }
 
+const COPY = {
+  invoice: {
+    who: "Who are you billing?",
+    whoPlaceholder: "Choose a party…",
+    countSuffix: (n: number) => ` — ${n} ready to bill`,
+    what: "What are you billing for?",
+    empty:
+      "Nothing completed and unbilled for this party. Work has to be marked completed in the activity log before it can be invoiced.",
+    docDate: "Invoice date",
+    docDateHint: "Decides which financial year's series numbers this invoice.",
+    submitting: "Issuing…",
+    submit: "Issue invoice",
+  },
+  bill: {
+    who: "Who is this owed to?",
+    whoPlaceholder: "Choose a vendor…",
+    countSuffix: (n: number) => ` — ${n} ready to bill`,
+    what: "What are you being billed for?",
+    empty:
+      "Nothing completed and unbilled for this vendor. Work has to be marked completed in the activity log before it can be billed.",
+    docDate: "Bill date",
+    docDateHint: "Decides which financial year's series numbers this bill.",
+    submitting: "Recording…",
+    submit: "Record bill",
+  },
+} as const;
+
 export function IssueForm({
   parties,
   activitiesByParty,
   locale,
   today,
+  docKind = "invoice",
 }: {
   parties: PartyOption[];
   activitiesByParty: Record<string, BillableActivity[]>;
   locale: string;
   today: string;
+  docKind?: "invoice" | "bill";
 }) {
+  const copy = COPY[docKind];
   const router = useRouter();
   const [partyId, setPartyId] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [docDate, setDocDate] = useState(today);
   const [treatment, setTreatment] = useState<"forward" | "reverse_charge" | "exempt">("forward");
   const [notes, setNotes] = useState("");
+  const [partyDocNo, setPartyDocNo] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -92,6 +123,10 @@ export function IssueForm({
       setError("Choose at least one piece of work to bill.");
       return;
     }
+    if (docKind === "bill" && partyDocNo.trim() === "") {
+      setError("Enter the vendor's own invoice or reference number — a bill isn't ours to number.");
+      return;
+    }
     setSaving(true);
     setError("");
 
@@ -99,13 +134,14 @@ export function IssueForm({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        doc_kind: "invoice",
+        doc_kind: docKind,
         counterparty_id: partyId,
         doc_date: docDate,
         due_date: dueDate || null,
         activity_ids: [...selected],
         tax_treatment: treatment,
         notes: notes || null,
+        party_doc_no: docKind === "bill" ? partyDocNo.trim() : null,
       }),
     });
     const body = await res.json();
@@ -123,16 +159,16 @@ export function IssueForm({
     <form onSubmit={submit} className="max-w-[760px] space-y-5">
       <div>
         <label htmlFor="party" className="mb-1.5 block text-[13px] font-medium text-ink">
-          Who are you billing?
+          {copy.who}
         </label>
         <select id="party" required value={partyId} onChange={(e) => pickParty(e.target.value)} className={inputClass}>
-          <option value="">Choose a party…</option>
+          <option value="">{copy.whoPlaceholder}</option>
           {parties.map((p) => {
             const count = activitiesByParty[p.id]?.length ?? 0;
             return (
               <option key={p.id} value={p.id}>
                 {p.name}
-                {count > 0 ? ` — ${count} ready to bill` : ""}
+                {count > 0 ? copy.countSuffix(count) : ""}
               </option>
             );
           })}
@@ -141,11 +177,10 @@ export function IssueForm({
 
       {partyId !== "" && (
         <div>
-          <span className="mb-1.5 block text-[13px] font-medium text-ink">What are you billing for?</span>
+          <span className="mb-1.5 block text-[13px] font-medium text-ink">{copy.what}</span>
           {available.length === 0 ? (
             <p className="rounded-md border border-line bg-paper p-4 text-[13px] text-ink-2">
-              Nothing completed and unbilled for this party. Work has to be marked completed
-              in the activity log before it can be invoiced.
+              {copy.empty}
             </p>
           ) : (
             <div className="divide-y divide-line-soft rounded-md border border-line bg-white">
@@ -180,14 +215,14 @@ export function IssueForm({
       <div className="grid gap-4 min-[560px]:grid-cols-2">
         <div>
           <label htmlFor="docDate" className="mb-1.5 block text-[13px] font-medium text-ink">
-            Invoice date
+            {copy.docDate}
           </label>
           <input
             id="docDate" type="date" required value={docDate}
             onChange={(e) => setDocDate(e.target.value)} className={inputClass}
           />
           <p className="mt-1.5 text-[12.5px] text-ink-3">
-            Decides which financial year&apos;s series numbers this invoice.
+            {copy.docDateHint}
           </p>
         </div>
         <div>
@@ -201,6 +236,21 @@ export function IssueForm({
         </div>
       </div>
 
+      {docKind === "bill" && (
+        <div>
+          <label htmlFor="partyDocNo" className="mb-1.5 block text-[13px] font-medium text-ink">
+            Vendor&apos;s invoice / reference no.
+          </label>
+          <input
+            id="partyDocNo" required value={partyDocNo}
+            onChange={(e) => setPartyDocNo(e.target.value)} className={`${inputClass} font-mono`}
+          />
+          <p className="mt-1.5 text-[12.5px] text-ink-3">
+            A bill is the vendor&apos;s own document — it carries their number, not ours.
+          </p>
+        </div>
+      )}
+
       <div>
         <label htmlFor="treatment" className="mb-1.5 block text-[13px] font-medium text-ink">
           Tax treatment
@@ -210,14 +260,16 @@ export function IssueForm({
           onChange={(e) => setTreatment(e.target.value as typeof treatment)} className={inputClass}
         >
           <option value="forward">Charge tax as normal</option>
-          <option value="reverse_charge">Reverse charge — the customer pays the tax</option>
+          <option value="reverse_charge">
+            {docKind === "invoice" ? "Reverse charge — the customer pays the tax" : "Reverse charge — you pay the tax"}
+          </option>
           <option value="exempt">Exempt or nil-rated</option>
         </select>
       </div>
 
       <div>
         <label htmlFor="notes" className="mb-1.5 block text-[13px] font-medium text-ink">
-          Notes <span className="font-normal text-ink-3">(optional, prints on the invoice)</span>
+          Notes <span className="font-normal text-ink-3">(optional, prints on the {docKind})</span>
         </label>
         <textarea
           id="notes" rows={2} value={notes}
@@ -237,8 +289,8 @@ export function IssueForm({
           </div>
           <p className="mt-1.5 text-[12.5px] text-ink-3">
             {treatment === "forward"
-              ? "Tax is worked out on the server from your tax settings and where this customer is, then added to this."
-              : "No tax is charged on this invoice, and it will say why."}
+              ? `Tax is worked out on the server from your tax settings and where this ${docKind === "invoice" ? "customer" : "vendor"} is, then added to this.`
+              : `No tax is charged on this ${docKind}, and it will say why.`}
           </p>
         </div>
       )}
@@ -246,7 +298,7 @@ export function IssueForm({
       {error && <p className="rounded-md bg-overdue-tint p-3 text-[13px] text-overdue">{error}</p>}
 
       <button type="submit" disabled={saving || chosen.length === 0} className={buttonPrimaryClass}>
-        {saving ? "Issuing…" : "Issue invoice"}
+        {saving ? copy.submitting : copy.submit}
       </button>
     </form>
   );

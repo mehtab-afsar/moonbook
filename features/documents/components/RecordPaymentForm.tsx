@@ -13,6 +13,23 @@ import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
  * cap that matters is the one in `allocate()`, which locks the document and
  * refuses to exceed its balance. This is a convenience; that is the rule.
  */
+const COPY = {
+  receivable: {
+    outstanding: "Outstanding on this invoice:",
+    amount: "Amount received",
+    when: "Received on",
+    trigger: "Record a payment",
+    submit: "Record it",
+  },
+  payable: {
+    outstanding: "Outstanding on this bill:",
+    amount: "Amount paid",
+    when: "Paid on",
+    trigger: "Record a payment",
+    submit: "Record it",
+  },
+} as const;
+
 export function RecordPaymentForm({
   documentId,
   partyId,
@@ -20,6 +37,7 @@ export function RecordPaymentForm({
   currency,
   locale,
   today,
+  direction = "receivable",
 }: {
   documentId: string;
   partyId: string;
@@ -27,7 +45,10 @@ export function RecordPaymentForm({
   currency: string;
   locale: string;
   today: string;
+  direction?: "receivable" | "payable";
 }) {
+  const copy = COPY[direction];
+  const paymentDirection = direction === "receivable" ? "in" : "out";
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(fromMinor(balanceMinor, currency as CurrencyCode)));
@@ -55,7 +76,7 @@ export function RecordPaymentForm({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        direction: "in",
+        direction: paymentDirection,
         party_id: partyId,
         amount_minor: amountMinor,
         paid_on: paidOn,
@@ -79,7 +100,7 @@ export function RecordPaymentForm({
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className={buttonPrimaryClass}>
-        Record a payment
+        {copy.trigger}
       </button>
     );
   }
@@ -87,13 +108,13 @@ export function RecordPaymentForm({
   return (
     <form onSubmit={submit} className="space-y-4 rounded-[10px] border border-line bg-white p-5">
       <p className="text-[13.5px] text-ink-2">
-        Outstanding on this invoice: <span className="font-mono text-ink">{formatMoney(balanceMinor, currency, locale)}</span>
+        {copy.outstanding} <span className="font-mono text-ink">{formatMoney(balanceMinor, currency, locale)}</span>
       </p>
 
       <div className="grid gap-4 min-[560px]:grid-cols-2">
         <div>
           <label htmlFor="amount" className="mb-1.5 block text-[13px] font-medium text-ink">
-            Amount received
+            {copy.amount}
           </label>
           <input
             id="amount" type="number" step="0.01" min="0.01" required
@@ -104,7 +125,7 @@ export function RecordPaymentForm({
         </div>
         <div>
           <label htmlFor="paidOn" className="mb-1.5 block text-[13px] font-medium text-ink">
-            Received on
+            {copy.when}
           </label>
           <input
             id="paidOn" type="date" required value={paidOn}

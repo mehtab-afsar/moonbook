@@ -26,17 +26,65 @@ export interface OpenDocument {
   balance_due_minor: number;
 }
 
+const COPY = {
+  in: {
+    who: "Who paid?",
+    whoPlaceholder: "Choose a party…",
+    openSuffix: (n: number) => ` — ${n} open`,
+    amount: "Amount received",
+    when: "Received on",
+    empty: "Nothing outstanding for this party. Anything recorded now is held as credit against their next invoice.",
+    unappliedNote: (money: string) => (
+      <>{money} will be left unapplied, held as credit against this party.</>
+    ),
+    overNote: (money: string) => <>That allocates {money} more than was received.</>,
+    submitting: "Recording…",
+    submit: "Record receipt",
+  },
+  out: {
+    who: "Who did we pay?",
+    whoPlaceholder: "Choose a vendor…",
+    openSuffix: (n: number) => ` — ${n} open`,
+    amount: "Amount paid",
+    when: "Paid on",
+    empty: "Nothing outstanding to this vendor. Anything recorded now is held as an advance against their next bill.",
+    unappliedNote: (money: string) => (
+      <>{money} will be left unapplied, held as an advance against this vendor.</>
+    ),
+    overNote: (money: string) => <>That allocates {money} more than was paid.</>,
+    submitting: "Recording…",
+    submit: "Record payment",
+  },
+} as const;
+
 export function ReceiptForm({
   parties,
   openByParty,
   locale,
   today,
+  direction = "in",
+  defaultCurrency,
 }: {
   parties: { id: string; name: string }[];
   openByParty: Record<string, OpenDocument[]>;
   locale: string;
   today: string;
+  direction?: "in" | "out";
+  /**
+   * A party with nothing open yet — never billed, or an advance paid before
+   * their first bill arrives — has no open document to read a currency from.
+   * Falling back to the organisation's own currency, rather than leaving it
+   * blank, is what lets that advance actually be recorded instead of
+   * silently computing to a zero amount.
+   */
+  defaultCurrency: string;
 }) {
+  const copy = COPY[direction];
+  // Two ReceiptForm instances (in and out) can render on the same page — a
+  // static id would collide, silently breaking label association for
+  // whichever instance loses. direction is always one of exactly two values
+  // here, so prefixing with it is enough to keep every id page-unique.
+  const id = (base: string) => `r${direction}-${base}`;
   const router = useRouter();
   const [partyId, setPartyId] = useState("");
   const [amount, setAmount] = useState("");
@@ -51,7 +99,7 @@ export function ReceiptForm({
   // `?? []` builds a fresh array each render, which would change the identity
   // of a useMemo dependency every time.
   const open = useMemo(() => openByParty[partyId] ?? [], [openByParty, partyId]);
-  const currency = (open[0]?.currency ?? "") as CurrencyCode;
+  const currency = (open[0]?.currency ?? defaultCurrency) as CurrencyCode;
 
   const amountMinor = useMemo(() => {
     if (!currency || amount.trim() === "") return 0;
@@ -109,7 +157,7 @@ export function ReceiptForm({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        direction: "in",
+        direction,
         party_id: partyId,
         amount_minor: amountMinor,
         paid_on: paidOn,
@@ -135,20 +183,20 @@ export function ReceiptForm({
     <form onSubmit={submit} className="space-y-4 rounded-[10px] border border-line bg-white p-5">
       <div className="grid gap-4 min-[720px]:grid-cols-2">
         <div className="min-[720px]:col-span-2">
-          <label htmlFor="rparty" className="mb-1.5 block text-[13px] font-medium text-ink">
-            Who paid?
+          <label htmlFor={id("party")} className="mb-1.5 block text-[13px] font-medium text-ink">
+            {copy.who}
           </label>
           <select
-            id="rparty" required value={partyId}
+            id={id("party")} required value={partyId}
             onChange={(e) => { setPartyId(e.target.value); setOverrides({}); }}
             className={inputClass}
           >
-            <option value="">Choose a party…</option>
+            <option value="">{copy.whoPlaceholder}</option>
             {parties.map((p) => {
               const n = openByParty[p.id]?.length ?? 0;
               return (
                 <option key={p.id} value={p.id}>
-                  {p.name}{n > 0 ? ` — ${n} open` : ""}
+                  {p.name}{n > 0 ? copy.openSuffix(n) : ""}
                 </option>
               );
             })}
@@ -156,30 +204,30 @@ export function ReceiptForm({
         </div>
 
         <div>
-          <label htmlFor="ramount" className="mb-1.5 block text-[13px] font-medium text-ink">
-            Amount received
+          <label htmlFor={id("amount")} className="mb-1.5 block text-[13px] font-medium text-ink">
+            {copy.amount}
           </label>
           <input
-            id="ramount" type="number" step="0.01" min="0.01" required value={amount}
+            id={id("amount")} type="number" step="0.01" min="0.01" required value={amount}
             onChange={(e) => setAmount(e.target.value)} className={`${inputClass} font-mono`}
           />
         </div>
 
         <div>
-          <label htmlFor="rpaidon" className="mb-1.5 block text-[13px] font-medium text-ink">
-            Received on
+          <label htmlFor={id("paidon")} className="mb-1.5 block text-[13px] font-medium text-ink">
+            {copy.when}
           </label>
           <input
-            id="rpaidon" type="date" required value={paidOn}
+            id={id("paidon")} type="date" required value={paidOn}
             onChange={(e) => setPaidOn(e.target.value)} className={inputClass}
           />
         </div>
 
         <div>
-          <label htmlFor="rmethod" className="mb-1.5 block text-[13px] font-medium text-ink">
+          <label htmlFor={id("method")} className="mb-1.5 block text-[13px] font-medium text-ink">
             How
           </label>
-          <select id="rmethod" value={method} onChange={(e) => setMethod(e.target.value)} className={inputClass}>
+          <select id={id("method")} value={method} onChange={(e) => setMethod(e.target.value)} className={inputClass}>
             <option value="bank">Bank transfer</option>
             <option value="cash">Cash</option>
             <option value="cheque">Cheque</option>
@@ -189,11 +237,11 @@ export function ReceiptForm({
         </div>
 
         <div>
-          <label htmlFor="rref" className="mb-1.5 block text-[13px] font-medium text-ink">
+          <label htmlFor={id("ref")} className="mb-1.5 block text-[13px] font-medium text-ink">
             Reference <span className="font-normal text-ink-3">(optional)</span>
           </label>
           <input
-            id="rref" value={reference} onChange={(e) => setReference(e.target.value)}
+            id={id("ref")} value={reference} onChange={(e) => setReference(e.target.value)}
             className={`${inputClass} font-mono`}
           />
         </div>
@@ -241,17 +289,9 @@ export function ReceiptForm({
 
           {unapplied !== 0 && (
             <p className={`text-[12.5px] ${unapplied < 0 ? "text-overdue" : "text-ink-2"}`}>
-              {unapplied > 0 ? (
-                <>
-                  {formatMoney(unapplied, currency, locale)} will be left unapplied, held as
-                  credit against this party.
-                </>
-              ) : (
-                <>
-                  That allocates {formatMoney(-unapplied, currency, locale)} more than was
-                  received.
-                </>
-              )}
+              {unapplied > 0
+                ? copy.unappliedNote(formatMoney(unapplied, currency, locale))
+                : copy.overNote(formatMoney(-unapplied, currency, locale))}
             </p>
           )}
         </div>
@@ -259,15 +299,14 @@ export function ReceiptForm({
 
       {partyId !== "" && open.length === 0 && (
         <p className="rounded-md border border-line bg-paper p-4 text-[13px] text-ink-2">
-          Nothing outstanding for this party. Anything recorded now is held as credit
-          against their next invoice.
+          {copy.empty}
         </p>
       )}
 
       {error && <p className="rounded-md bg-overdue-tint p-3 text-[13px] text-overdue">{error}</p>}
 
       <button type="submit" disabled={saving || partyId === ""} className={buttonPrimaryClass}>
-        {saving ? "Recording…" : "Record receipt"}
+        {saving ? copy.submitting : copy.submit}
       </button>
     </form>
   );

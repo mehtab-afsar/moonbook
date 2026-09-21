@@ -36,7 +36,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
   const { data: doc, error } = await supabase
     .from("documents")
-    .select("id, doc_kind, doc_no, party_doc_no, doc_date, due_date, status, currency, counterparty_id, issued_snapshot")
+    .select("id, doc_kind, doc_no, party_doc_no, doc_date, due_date, status, currency, direction, counterparty_id, issued_snapshot")
     .eq("id", id)
     .maybeSingle();
 
@@ -58,14 +58,20 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       // are fetched separately rather than embedded — see CONVENTIONS.md §9.
       supabase
         .from("payment_balances")
-        .select("payment_id, party_id, paid_on, unapplied_minor")
+        .select("payment_id, party_id, direction, paid_on, unapplied_minor")
         .eq("party_id", doc.counterparty_id)
+        // A receivable document (invoice) can only ever be settled by 'in'
+        // money; a payable one (bill) only ever by 'out' money — allocate()
+        // enforces this too, but offering the wrong kind here would just be
+        // a confusing dead end.
+        .eq("direction", doc.direction === "receivable" ? "in" : "out")
         .gt("unapplied_minor", 0)
         .order("paid_on"),
       supabase
         .from("credit_balances")
-        .select("document_id, counterparty_id, doc_no, unapplied_minor")
+        .select("document_id, counterparty_id, doc_no, direction, unapplied_minor")
         .eq("counterparty_id", doc.counterparty_id)
+        .eq("direction", doc.direction)
         .gt("unapplied_minor", 0)
         // credit_balances carries no date — the number is issued in date
         // order within a series, so it sorts the same way.
@@ -208,7 +214,9 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
           <section className="space-y-3">
             <h2 className="text-[15px] font-medium text-ink">Payments</h2>
             {(allocations ?? []).length === 0 ? (
-              <p className="text-[13.5px] text-ink-3">Nothing received against this yet.</p>
+              <p className="text-[13.5px] text-ink-3">
+                {doc.direction === "payable" ? "Nothing paid against this yet." : "Nothing received against this yet."}
+              </p>
             ) : (
               <ul className="divide-y divide-line-soft rounded-[10px] border border-line bg-white">
                 {(allocations ?? []).map((a) => {
@@ -239,6 +247,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
                   currency={doc.currency}
                   locale={locale}
                   today={today}
+                  direction={doc.direction as "receivable" | "payable"}
                 />
               )}
           </section>

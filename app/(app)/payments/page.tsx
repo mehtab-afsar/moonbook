@@ -15,42 +15,14 @@ const METHOD_LABEL: Record<string, string> = {
   online: "Online",
 };
 
-export default async function PaymentsPage() {
-  const auth = await verifyAuth();
-  if (!auth.ok) redirect("/");
-
-  const supabase = await createClient();
-  const [{ data: org }, { data: parties }, { data: payments, error }, { data: open }, { data: applied }] =
-    await Promise.all([
-      supabase.from("organisations").select("locale, timezone").eq("id", auth.ctx.orgId).single(),
-      supabase.from("parties").select("id, name").order("name"),
-      supabase
-        .from("payments")
-        // FK named: payments reaches parties by one key today, but naming it
-        // costs nothing and survives the second one being added.
-        .select(
-          "id, paid_on, method, reference_no, currency, amount_minor, party_id, parties!payments_party_id_fkey(name)",
-        )
-        .eq("direction", "in")
-        .order("paid_on", { ascending: false })
-        .limit(200),
-      // Views, fetched separately — PostgREST cannot embed one.
-      supabase
-        .from("document_balances")
-        .select("document_id, counterparty_id, doc_no, doc_date, due_date, currency, balance_due_minor")
-        .gt("balance_due_minor", 0)
-        .order("doc_date"),
-      supabase.from("payment_balances").select("payment_id, applied_minor, unapplied_minor"),
-    ]);
-
-  if (error) throw new Error(`Could not load payments: ${error.message}`);
-
-  const locale = org?.locale ?? "en";
-
-  const openByParty: Record<string, OpenDocument[]> = {};
-  for (const d of open ?? []) {
+/** Group open document_balances rows by counterparty, for one direction. */
+function groupOpen(
+  rows: { document_id: unknown; counterparty_id: unknown; doc_no: unknown; doc_date: unknown; due_date: unknown; currency: unknown; balance_due_minor: number | null }[],
+): Record<string, OpenDocument[]> {
+  const byParty: Record<string, OpenDocument[]> = {};
+  for (const d of rows) {
     const key = d.counterparty_id as string;
-    (openByParty[key] ??= []).push({
+    (byParty[key] ??= []).push({
       id: d.document_id as string,
       doc_no: (d.doc_no as string) ?? "—",
       doc_date: d.doc_date as string,
@@ -59,6 +31,69 @@ export default async function PaymentsPage() {
       balance_due_minor: d.balance_due_minor ?? 0,
     });
   }
+  return byParty;
+}
+
+export default async function PaymentsPage() {
+  const auth = await verifyAuth();
+  if (!auth.ok) redirect("/");
+
+  const supabase = await createClient();
+  const [
+    { data: org },
+    { data: parties },
+    { data: receipts, error: receiptsErr },
+    { data: outPayments, error: outErr },
+    { data: openReceivable },
+    { data: openPayable },
+    { data: applied },
+  ] = await Promise.all([
+    supabase.from("organisations").select("locale, timezone, base_currency").eq("id", auth.ctx.orgId).single(),
+    supabase.from("parties").select("id, name").order("name"),
+    supabase
+      .from("payments")
+      // FK named: payments reaches parties by one key today, but naming it
+      // costs nothing and survives the second one being added.
+      .select(
+        "id, paid_on, method, reference_no, currency, amount_minor, party_id, parties!payments_party_id_fkey(name)",
+      )
+      .eq("direction", "in")
+      .order("paid_on", { ascending: false })
+      .limit(200),
+    supabase
+      .from("payments")
+      .select(
+        "id, paid_on, method, reference_no, currency, amount_minor, party_id, parties!payments_party_id_fkey(name)",
+      )
+      .eq("direction", "out")
+      .order("paid_on", { ascending: false })
+      .limit(200),
+    // Views, fetched separately — PostgREST cannot embed one. Split by
+    // direction: a receipt must only ever be offered an invoice to settle,
+    // and a vendor payment only ever a bill — allocate() enforces this too,
+    // but offering the wrong kind here would just be a confusing dead end.
+    supabase
+      .from("document_balances")
+      .select("document_id, counterparty_id, doc_no, doc_date, due_date, currency, balance_due_minor")
+      .eq("direction", "receivable")
+      .gt("balance_due_minor", 0)
+      .order("doc_date"),
+    supabase
+      .from("document_balances")
+      .select("document_id, counterparty_id, doc_no, doc_date, due_date, currency, balance_due_minor")
+      .eq("direction", "payable")
+      .gt("balance_due_minor", 0)
+      .order("doc_date"),
+    supabase.from("payment_balances").select("payment_id, applied_minor, unapplied_minor"),
+  ]);
+
+  if (receiptsErr) throw new Error(`Could not load payments: ${receiptsErr.message}`);
+  if (outErr) throw new Error(`Could not load vendor payments: ${outErr.message}`);
+
+  const locale = org?.locale ?? "en";
+
+  const openByParty = groupOpen(openReceivable ?? []);
+  const openPayableByParty = groupOpen(openPayable ?? []);
 
   const unappliedById = new Map(
     (applied ?? []).map((a) => [a.payment_id as string, a.unapplied_minor ?? 0]),
@@ -69,69 +104,134 @@ export default async function PaymentsPage() {
   }).format(new Date());
 
   return (
-    <div className="space-y-6 p-8">
-      <header>
-        <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Payments</h1>
-        <p className="mt-1 text-[13.5px] text-ink-2">
-          Money received. A receipt need not settle anything exactly — whatever is left over
-          stays visible as unapplied credit rather than being forced onto an invoice.
-        </p>
-      </header>
+    <div className="space-y-10 p-8">
+      <section className="space-y-6">
+        <header>
+          <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Payments</h1>
+          <p className="mt-1 text-[13.5px] text-ink-2">
+            Money received. A receipt need not settle anything exactly — whatever is left over
+            stays visible as unapplied credit rather than being forced onto an invoice.
+          </p>
+        </header>
 
-      <ReceiptForm
-        parties={parties ?? []}
-        openByParty={openByParty}
-        locale={locale}
-        today={today}
-      />
+        <ReceiptForm
+          parties={parties ?? []}
+          openByParty={openByParty}
+          locale={locale}
+          today={today}
+          direction="in"
+          defaultCurrency={org?.base_currency ?? "INR"}
+        />
 
-      <div className="overflow-x-auto rounded-[10px] border border-line bg-white">
-        <table className="w-full text-left text-[13.5px]">
-          <thead>
-            <tr className="border-b border-line-soft text-[12px] uppercase tracking-wide text-ink-3">
-              <th className="px-5 py-3 font-medium">Date</th>
-              <th className="px-5 py-3 font-medium">From</th>
-              <th className="px-5 py-3 font-medium">How</th>
-              <th className="px-5 py-3 font-medium">Reference</th>
-              <th className="px-5 py-3 font-medium">Amount</th>
-              <th className="px-5 py-3 font-medium">Unapplied</th>
+        <PaymentsTable
+          rows={receipts ?? []}
+          unappliedById={unappliedById}
+          locale={locale}
+          partyColumn="From"
+          emptyLabel="Nothing received yet."
+        />
+      </section>
+
+      <section className="space-y-6">
+        <header>
+          <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Vendor payments</h2>
+          <p className="mt-1 text-[13.5px] text-ink-2">
+            Money paid out, including advances paid before a vendor&apos;s bill has arrived —
+            those stay visible as unapplied until there&apos;s a bill to apply them to.
+          </p>
+        </header>
+
+        <ReceiptForm
+          parties={parties ?? []}
+          openByParty={openPayableByParty}
+          locale={locale}
+          today={today}
+          direction="out"
+          defaultCurrency={org?.base_currency ?? "INR"}
+        />
+
+        <PaymentsTable
+          rows={outPayments ?? []}
+          unappliedById={unappliedById}
+          locale={locale}
+          partyColumn="To"
+          emptyLabel="Nothing paid out yet."
+        />
+      </section>
+    </div>
+  );
+}
+
+type PaymentRow = {
+  id: string;
+  paid_on: string;
+  method: string;
+  reference_no: string | null;
+  currency: string;
+  amount_minor: number;
+  parties: { name: string } | null;
+};
+
+function PaymentsTable({
+  rows,
+  unappliedById,
+  locale,
+  partyColumn,
+  emptyLabel,
+}: {
+  rows: unknown[];
+  unappliedById: Map<string, number>;
+  locale: string;
+  partyColumn: string;
+  emptyLabel: string;
+}) {
+  const payments = rows as unknown as PaymentRow[];
+  return (
+    <div className="overflow-x-auto rounded-[10px] border border-line bg-white">
+      <table className="w-full text-left text-[13.5px]">
+        <thead>
+          <tr className="border-b border-line-soft text-[12px] uppercase tracking-wide text-ink-3">
+            <th className="px-5 py-3 font-medium">Date</th>
+            <th className="px-5 py-3 font-medium">{partyColumn}</th>
+            <th className="px-5 py-3 font-medium">How</th>
+            <th className="px-5 py-3 font-medium">Reference</th>
+            <th className="px-5 py-3 font-medium">Amount</th>
+            <th className="px-5 py-3 font-medium">Unapplied</th>
+          </tr>
+        </thead>
+        <tbody>
+          {payments.length === 0 && (
+            <tr>
+              <td colSpan={6} className="px-5 py-10 text-center text-ink-3">
+                {emptyLabel}
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {(payments ?? []).length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-ink-3">
-                  Nothing received yet.
+          )}
+          {payments.map((p) => {
+            const unapplied = unappliedById.get(p.id) ?? 0;
+            return (
+              <tr key={p.id} className="border-b border-line-soft last:border-b-0">
+                <td className="px-5 py-3 font-mono text-ink-2">{p.paid_on}</td>
+                <td className="px-5 py-3 font-medium text-ink">{p.parties?.name ?? "—"}</td>
+                <td className="px-5 py-3 text-ink-2">{METHOD_LABEL[p.method] ?? p.method}</td>
+                <td className="px-5 py-3 font-mono text-ink-2">{p.reference_no ?? "—"}</td>
+                <td className="px-5 py-3 font-mono text-ink">
+                  {formatMoney(p.amount_minor, p.currency, locale)}
+                </td>
+                <td className="px-5 py-3 font-mono">
+                  {unapplied > 0 ? (
+                    <span className="text-pending-ink">
+                      {formatMoney(unapplied, p.currency, locale)}
+                    </span>
+                  ) : (
+                    <span className="text-ink-3">—</span>
+                  )}
                 </td>
               </tr>
-            )}
-            {(payments ?? []).map((p) => {
-              const party = (p as unknown as { parties: { name: string } | null }).parties;
-              const unapplied = unappliedById.get(p.id) ?? 0;
-              return (
-                <tr key={p.id} className="border-b border-line-soft last:border-b-0">
-                  <td className="px-5 py-3 font-mono text-ink-2">{p.paid_on}</td>
-                  <td className="px-5 py-3 font-medium text-ink">{party?.name ?? "—"}</td>
-                  <td className="px-5 py-3 text-ink-2">{METHOD_LABEL[p.method] ?? p.method}</td>
-                  <td className="px-5 py-3 font-mono text-ink-2">{p.reference_no ?? "—"}</td>
-                  <td className="px-5 py-3 font-mono text-ink">
-                    {formatMoney(p.amount_minor, p.currency, locale)}
-                  </td>
-                  <td className="px-5 py-3 font-mono">
-                    {unapplied > 0 ? (
-                      <span className="text-pending-ink">
-                        {formatMoney(unapplied, p.currency, locale)}
-                      </span>
-                    ) : (
-                      <span className="text-ink-3">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

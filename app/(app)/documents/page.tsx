@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyAuth } from "@/lib/auth/verify";
 import { formatMoney } from "@/lib/money";
 import { attachBalances, settlementLabel } from "@/lib/documents/with-balances";
-import { buttonPrimaryClass } from "@/lib/ui/styles";
+import { buttonPrimaryClass, buttonSecondaryClass } from "@/lib/ui/styles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Documents" };
@@ -59,9 +59,14 @@ export default async function DocumentsPage() {
             offsets — nothing here is a stored total that can drift.
           </p>
         </div>
-        <Link href="/documents/new" className={buttonPrimaryClass}>
-          Issue an invoice
-        </Link>
+        <div className="flex gap-3">
+          <Link href="/documents/new/bill" className={buttonSecondaryClass}>
+            Record a bill
+          </Link>
+          <Link href="/documents/new" className={buttonPrimaryClass}>
+            Issue an invoice
+          </Link>
+        </div>
       </header>
 
       <div className="overflow-x-auto rounded-[10px] border border-line bg-white">
