@@ -13,11 +13,6 @@
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > types/supabase.ts",
     "db:lint": "supabase db lint --level warning",
-    "verify:ledger": "node scripts/verify-ledger.mjs",
-    "verify:documents": "node scripts/verify-documents.mjs",
-    "verify:document-ui": "node scripts/verify-document-ui.mjs",
-    "verify:back-office": "node scripts/verify-back-office.mjs",
-    "verify:all": "for s in ledger activities templates dynamic-form signup-flow template-signup documents document-ui back-office; do node scripts/verify-$s.mjs || exit 1; done",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "demo": "node scripts/demo.mjs"

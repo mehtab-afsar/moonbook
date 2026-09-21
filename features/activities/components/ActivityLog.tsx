@@ -7,6 +7,7 @@ import {
   type ActivityTypeOption,
   type EditableActivity,
 } from "@/features/activities/components/ActivityForm";
+import { AttachmentButton } from "@/features/activities/components/AttachmentButton";
 
 /**
  * The log, with a correction path.
@@ -32,8 +33,10 @@ export interface LogRow extends Omit<EditableActivity, "status"> {
   status: "pending" | "completed" | "invoiced" | "cancelled";
   currency: string;
   type_label: string;
+  uses_job_margin: boolean;
   party_name: string;
   dim1_value: string | null;
+  attachment_path: string | null;
 }
 
 export function ActivityLog({
@@ -86,6 +89,7 @@ export function ActivityLog({
               <th className="px-5 py-3 font-medium">Party</th>
               <th className="px-5 py-3 font-medium">Reference</th>
               <th className="px-5 py-3 font-medium">Amount</th>
+              <th className="px-5 py-3 font-medium">Margin</th>
               <th className="px-5 py-3 font-medium">Status</th>
               <th className="px-5 py-3 font-medium"></th>
             </tr>
@@ -93,7 +97,7 @@ export function ActivityLog({
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-ink-3">
+                <td colSpan={8} className="px-5 py-10 text-center text-ink-3">
                   Nothing recorded yet.
                 </td>
               </tr>
@@ -110,6 +114,11 @@ export function ActivityLog({
                 <td className="px-5 py-3 font-mono text-ink">
                   {formatMoney(r.amount_minor, r.currency, locale)}
                 </td>
+                <td className="px-5 py-3 font-mono text-ink-2">
+                  {r.uses_job_margin && r.direct_cost_minor !== null
+                    ? formatMoney(r.amount_minor - r.direct_cost_minor, r.currency, locale)
+                    : "—"}
+                </td>
                 <td className="px-5 py-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-[11.5px] font-medium ${STATUS_STYLE[r.status] ?? ""}`}
@@ -118,7 +127,9 @@ export function ActivityLog({
                   </span>
                 </td>
                 <td className="px-5 py-3 text-right">
-                  {r.status === "invoiced" ? (
+                  <div className="flex items-center justify-end gap-3">
+                    <AttachmentButton activityId={r.id} hasAttachment={Boolean(r.attachment_path)} />
+                    {r.status === "invoiced" ? (
                     <span
                       className="text-[12.5px] text-ink-3"
                       title="Billed work cannot be edited — cancel the document or raise a credit note"
@@ -134,6 +145,7 @@ export function ActivityLog({
                       Correct
                     </button>
                   )}
+                  </div>
                 </td>
               </tr>
             ))}

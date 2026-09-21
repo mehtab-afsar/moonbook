@@ -42,6 +42,15 @@ const ALLOWED = [
   // issue_document again, for line ordering. Carries the printable_details
   // lateral join forward unchanged.
   "20260916000021_line_order.sql",
+  // One-time data migration onto the logistics fork: reads the OLD
+  // activities.details to populate the new logistics_activities table's
+  // real typed columns (origin/destination/vehicle_no/load_type/vendor_ref).
+  // A migration reading a column once to retire it is not the same kind of
+  // thing this guard exists to catch — an ongoing view or report depending
+  // on details' shape. Once run, this file's `details` reference is history.
+  "20260923000002_logistics_vertical_migrate_freight_orgs.sql",
+  // Same one-time migration, onto the plastics fork.
+  "20260924000002_plastics_vertical_migrate_scrap_orgs.sql",
 ];
 
 /** Every `create [or replace] view ... as <body>;` in the migrations. */

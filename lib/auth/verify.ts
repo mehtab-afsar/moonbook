@@ -2,11 +2,15 @@ import { createClient } from "@/lib/supabase/server";
 
 export type Role = "owner" | "staff";
 
+export type Vertical = "shared" | "logistics" | "plastics";
+
 export interface AuthContext {
   userId: string;
   orgId: string;
   role: Role;
   fullName: string | null;
+  /** Which ledger this organisation is served by — see organisations.vertical. */
+  vertical: Vertical;
 }
 
 export type VerifyResult =
@@ -37,9 +41,11 @@ export async function verifyAuth(): Promise<VerifyResult> {
     return { ok: false, error: "Not signed in", status: 401 };
   }
 
+  // FK named: profiles reaches organisations by org_id, and an ambiguous
+  // embed is a PostgREST error rather than a guess.
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, org_id, role, full_name")
+    .select("id, org_id, role, full_name, organisations!profiles_org_id_fkey(vertical)")
     .eq("id", userData.user.id)
     .single();
 
@@ -54,6 +60,7 @@ export async function verifyAuth(): Promise<VerifyResult> {
       orgId: profile.org_id,
       role: profile.role as Role,
       fullName: profile.full_name,
+      vertical: (profile.organisations?.vertical as Vertical | undefined) ?? "shared",
     },
   };
 }

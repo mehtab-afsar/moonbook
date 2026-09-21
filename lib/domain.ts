@@ -93,6 +93,14 @@ export type ResetCadence = (typeof RESET_CADENCES)[number];
 export const ROLES = ["owner", "staff"] as const;
 export type RoleName = (typeof ROLES)[number];
 
+/** Which ledger an organisation is served by — see organisations.vertical. */
+export const VERTICALS = ["shared", "logistics", "plastics"] as const;
+export type VerticalName = (typeof VERTICALS)[number];
+
+/** plastics_activities.grade — the plastics vertical's own closed set. */
+export const PLASTICS_GRADES = ["A", "B", "C", "Mixed"] as const;
+export type PlasticsGrade = (typeof PLASTICS_GRADES)[number];
+
 /**
  * Each list paired with the SQL constraint it must equal.
  *
@@ -117,4 +125,11 @@ export const SQL_PARITY: Readonly<Record<string, readonly string[]>> = {
   payments_direction_chk: PAYMENT_DIRECTIONS,
   payments_method_chk: PAYMENT_METHODS,
   profiles_role_chk: ROLES,
+  organisations_vertical_chk: VERTICALS,
+  logistics_activities_direction_chk: DIRECTIONS,
+  logistics_activities_status_chk: ACTIVITY_STATUSES,
+  logistics_document_series_kind_chk: BILLABLE_DOC_KINDS,
+  plastics_activities_direction_chk: DIRECTIONS,
+  plastics_activities_status_chk: ACTIVITY_STATUSES,
+  plastics_document_series_kind_chk: BILLABLE_DOC_KINDS,
 };

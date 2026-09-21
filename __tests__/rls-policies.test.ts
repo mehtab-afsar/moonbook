@@ -28,6 +28,8 @@ const NO_POLICY_BY_DESIGN = new Set<string>([
   // Gapless counters. A client that could increment one directly could burn
   // numbers or forge them, so only SECURITY DEFINER functions reach it.
   "public.document_sequences",
+  "public.logistics_document_sequences",
+  "public.plastics_document_sequences",
 ]);
 
 interface Policy {

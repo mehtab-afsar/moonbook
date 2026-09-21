@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, Banknote, PackageCheck, Users, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, FileText, Banknote, PackageCheck, Receipt, Users, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,6 +23,7 @@ const NAV = [
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/payments", label: "Payments", icon: Banknote },
   { href: "/activities", label: "Activity log", icon: PackageCheck },
+  { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/parties", label: "Parties", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;

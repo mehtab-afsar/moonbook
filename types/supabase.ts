@@ -38,6 +38,7 @@ export type Database = {
         Row: {
           activity_type_id: string
           amount_minor: number
+          attachment_path: string | null
           bill_to_party_id: string | null
           created_at: string
           created_by: string | null
@@ -61,6 +62,7 @@ export type Database = {
         Insert: {
           activity_type_id: string
           amount_minor: number
+          attachment_path?: string | null
           bill_to_party_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -84,6 +86,7 @@ export type Database = {
         Update: {
           activity_type_id?: string
           amount_minor?: number
+          attachment_path?: string | null
           bill_to_party_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -812,6 +815,70 @@ export type Database = {
           },
         ]
       }
+      expenses: {
+        Row: {
+          amount_minor: number
+          category: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          id: string
+          incurred_on: string
+          org_id: string
+          party_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_minor: number
+          category: string
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          description?: string | null
+          id?: string
+          incurred_on?: string
+          org_id: string
+          party_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_minor?: number
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          id?: string
+          incurred_on?: string
+          org_id?: string
+          party_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_party_org_fk"
+            columns: ["party_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       industry_templates: {
         Row: {
           created_at: string
@@ -836,6 +903,514 @@ export type Database = {
         }
         Relationships: []
       }
+      logistics_activities: {
+        Row: {
+          amount_minor: number
+          attachment_path: string | null
+          bill_to_party_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          destination: string | null
+          direct_cost_minor: number | null
+          direction: string
+          id: string
+          load_type: string | null
+          notes: string | null
+          occurred_on: string
+          org_id: string
+          origin: string | null
+          party_id: string
+          reference: string | null
+          status: string
+          updated_at: string
+          vehicle_no: string | null
+          vendor_ref: string | null
+        }
+        Insert: {
+          amount_minor: number
+          attachment_path?: string | null
+          bill_to_party_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          destination?: string | null
+          direct_cost_minor?: number | null
+          direction: string
+          id?: string
+          load_type?: string | null
+          notes?: string | null
+          occurred_on: string
+          org_id: string
+          origin?: string | null
+          party_id: string
+          reference?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_no?: string | null
+          vendor_ref?: string | null
+        }
+        Update: {
+          amount_minor?: number
+          attachment_path?: string | null
+          bill_to_party_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          destination?: string | null
+          direct_cost_minor?: number | null
+          direction?: string
+          id?: string
+          load_type?: string | null
+          notes?: string | null
+          occurred_on?: string
+          org_id?: string
+          origin?: string | null
+          party_id?: string
+          reference?: string | null
+          status?: string
+          updated_at?: string
+          vehicle_no?: string | null
+          vendor_ref?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_activities_bill_to_org_fk"
+            columns: ["bill_to_party_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "logistics_activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_activities_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_activities_party_org_fk"
+            columns: ["party_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      logistics_allocations: {
+        Row: {
+          amount_minor: number
+          created_at: string
+          created_by: string | null
+          id: string
+          org_id: string
+          payment_id: string | null
+          target_document_id: string
+        }
+        Insert: {
+          amount_minor: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id: string
+          payment_id?: string | null
+          target_document_id: string
+        }
+        Update: {
+          amount_minor?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id?: string
+          payment_id?: string | null
+          target_document_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_allocations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_allocations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_allocations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_payment_balances"
+            referencedColumns: ["payment_id"]
+          },
+          {
+            foreignKeyName: "logistics_allocations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_allocations_target_document_id_fkey"
+            columns: ["target_document_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_document_balances"
+            referencedColumns: ["document_id"]
+          },
+          {
+            foreignKeyName: "logistics_allocations_target_document_id_fkey"
+            columns: ["target_document_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logistics_document_lines: {
+        Row: {
+          activity_id: string | null
+          amount_minor: number
+          description: string
+          document_id: string
+          id: string
+          org_id: string
+          sort_order: number
+        }
+        Insert: {
+          activity_id?: string | null
+          amount_minor: number
+          description: string
+          document_id: string
+          id?: string
+          org_id: string
+          sort_order?: number
+        }
+        Update: {
+          activity_id?: string | null
+          amount_minor?: number
+          description?: string
+          document_id?: string
+          id?: string
+          org_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_document_lines_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_document_lines_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_document_balances"
+            referencedColumns: ["document_id"]
+          },
+          {
+            foreignKeyName: "logistics_document_lines_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_document_lines_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logistics_document_sequences: {
+        Row: {
+          doc_kind: string
+          last_value: number
+          org_id: string
+          period_key: string
+        }
+        Insert: {
+          doc_kind: string
+          last_value?: number
+          org_id: string
+          period_key: string
+        }
+        Update: {
+          doc_kind?: string
+          last_value?: number
+          org_id?: string
+          period_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_document_sequences_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logistics_document_series: {
+        Row: {
+          doc_kind: string
+          is_self_numbered: boolean
+          org_id: string
+          prefix: string
+          updated_at: string
+        }
+        Insert: {
+          doc_kind: string
+          is_self_numbered?: boolean
+          org_id: string
+          prefix: string
+          updated_at?: string
+        }
+        Update: {
+          doc_kind?: string
+          is_self_numbered?: boolean
+          org_id?: string
+          prefix?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_document_series_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logistics_document_taxes: {
+        Row: {
+          amount_minor: number
+          component_code: string
+          component_label: string
+          document_id: string
+          id: string
+          org_id: string
+          rate_pct: number
+        }
+        Insert: {
+          amount_minor: number
+          component_code: string
+          component_label: string
+          document_id: string
+          id?: string
+          org_id: string
+          rate_pct: number
+        }
+        Update: {
+          amount_minor?: number
+          component_code?: string
+          component_label?: string
+          document_id?: string
+          id?: string
+          org_id?: string
+          rate_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_document_taxes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_document_balances"
+            referencedColumns: ["document_id"]
+          },
+          {
+            foreignKeyName: "logistics_document_taxes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_document_taxes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logistics_documents: {
+        Row: {
+          counterparty_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          direction: string
+          doc_date: string
+          doc_kind: string
+          doc_no: string | null
+          due_date: string | null
+          id: string
+          issued_snapshot: Json | null
+          notes: string | null
+          org_id: string
+          party_doc_no: string | null
+          pdf_path: string | null
+          ship_to_party_id: string | null
+          status: string
+          tax_treatment: string
+          taxable_value_minor: number
+          total_minor: number
+        }
+        Insert: {
+          counterparty_id: string
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          direction: string
+          doc_date: string
+          doc_kind: string
+          doc_no?: string | null
+          due_date?: string | null
+          id?: string
+          issued_snapshot?: Json | null
+          notes?: string | null
+          org_id: string
+          party_doc_no?: string | null
+          pdf_path?: string | null
+          ship_to_party_id?: string | null
+          status?: string
+          tax_treatment?: string
+          taxable_value_minor: number
+          total_minor: number
+        }
+        Update: {
+          counterparty_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          direction?: string
+          doc_date?: string
+          doc_kind?: string
+          doc_no?: string | null
+          due_date?: string | null
+          id?: string
+          issued_snapshot?: Json | null
+          notes?: string | null
+          org_id?: string
+          party_doc_no?: string | null
+          pdf_path?: string | null
+          ship_to_party_id?: string | null
+          status?: string
+          tax_treatment?: string
+          taxable_value_minor?: number
+          total_minor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_documents_counterparty_org_fk"
+            columns: ["counterparty_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "logistics_documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_documents_shipto_org_fk"
+            columns: ["ship_to_party_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      logistics_payments: {
+        Row: {
+          amount_minor: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          direction: string
+          id: string
+          method: string
+          org_id: string
+          paid_on: string
+          party_id: string
+          reference_no: string | null
+        }
+        Insert: {
+          amount_minor: number
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          direction: string
+          id?: string
+          method: string
+          org_id: string
+          paid_on: string
+          party_id: string
+          reference_no?: string | null
+        }
+        Update: {
+          amount_minor?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          direction?: string
+          id?: string
+          method?: string
+          org_id?: string
+          paid_on?: string
+          party_id?: string
+          reference_no?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_payments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_payments_party_org_fk"
+            columns: ["party_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       organisations: {
         Row: {
           address: string | null
@@ -854,6 +1429,7 @@ export type Database = {
           tax_regime: string
           timezone: string
           updated_at: string
+          vertical: string
         }
         Insert: {
           address?: string | null
@@ -872,6 +1448,7 @@ export type Database = {
           tax_regime?: string
           timezone?: string
           updated_at?: string
+          vertical?: string
         }
         Update: {
           address?: string | null
@@ -890,6 +1467,7 @@ export type Database = {
           tax_regime?: string
           timezone?: string
           updated_at?: string
+          vertical?: string
         }
         Relationships: []
       }
@@ -1032,6 +1610,507 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "parties"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      plastics_activities: {
+        Row: {
+          amount_minor: number
+          attachment_path: string | null
+          bill_to_party_id: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          direct_cost_minor: number | null
+          direction: string
+          grade: string | null
+          id: string
+          material: string
+          net_weight_kg: number
+          notes: string | null
+          occurred_on: string
+          org_id: string
+          party_id: string
+          rate_per_kg_minor: number
+          reference: string | null
+          status: string
+          ticket_no: string | null
+          updated_at: string
+          vehicle_no: string | null
+        }
+        Insert: {
+          amount_minor: number
+          attachment_path?: string | null
+          bill_to_party_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          direct_cost_minor?: number | null
+          direction: string
+          grade?: string | null
+          id?: string
+          material: string
+          net_weight_kg: number
+          notes?: string | null
+          occurred_on: string
+          org_id: string
+          party_id: string
+          rate_per_kg_minor: number
+          reference?: string | null
+          status?: string
+          ticket_no?: string | null
+          updated_at?: string
+          vehicle_no?: string | null
+        }
+        Update: {
+          amount_minor?: number
+          attachment_path?: string | null
+          bill_to_party_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          direct_cost_minor?: number | null
+          direction?: string
+          grade?: string | null
+          id?: string
+          material?: string
+          net_weight_kg?: number
+          notes?: string | null
+          occurred_on?: string
+          org_id?: string
+          party_id?: string
+          rate_per_kg_minor?: number
+          reference?: string | null
+          status?: string
+          ticket_no?: string | null
+          updated_at?: string
+          vehicle_no?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plastics_activities_bill_to_org_fk"
+            columns: ["bill_to_party_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "plastics_activities_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_activities_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_activities_party_org_fk"
+            columns: ["party_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      plastics_allocations: {
+        Row: {
+          amount_minor: number
+          created_at: string
+          created_by: string | null
+          id: string
+          org_id: string
+          payment_id: string | null
+          target_document_id: string
+        }
+        Insert: {
+          amount_minor: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id: string
+          payment_id?: string | null
+          target_document_id: string
+        }
+        Update: {
+          amount_minor?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id?: string
+          payment_id?: string | null
+          target_document_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plastics_allocations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_allocations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_allocations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "plastics_payment_balances"
+            referencedColumns: ["payment_id"]
+          },
+          {
+            foreignKeyName: "plastics_allocations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "plastics_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_allocations_target_document_id_fkey"
+            columns: ["target_document_id"]
+            isOneToOne: false
+            referencedRelation: "plastics_document_balances"
+            referencedColumns: ["document_id"]
+          },
+          {
+            foreignKeyName: "plastics_allocations_target_document_id_fkey"
+            columns: ["target_document_id"]
+            isOneToOne: false
+            referencedRelation: "plastics_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plastics_document_lines: {
+        Row: {
+          activity_id: string | null
+          amount_minor: number
+          description: string
+          document_id: string
+          id: string
+          org_id: string
+          sort_order: number
+        }
+        Insert: {
+          activity_id?: string | null
+          amount_minor: number
+          description: string
+          document_id: string
+          id?: string
+          org_id: string
+          sort_order?: number
+        }
+        Update: {
+          activity_id?: string | null
+          amount_minor?: number
+          description?: string
+          document_id?: string
+          id?: string
+          org_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plastics_document_lines_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "plastics_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_document_lines_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "plastics_document_balances"
+            referencedColumns: ["document_id"]
+          },
+          {
+            foreignKeyName: "plastics_document_lines_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "plastics_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_document_lines_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plastics_document_sequences: {
+        Row: {
+          doc_kind: string
+          last_value: number
+          org_id: string
+          period_key: string
+        }
+        Insert: {
+          doc_kind: string
+          last_value?: number
+          org_id: string
+          period_key: string
+        }
+        Update: {
+          doc_kind?: string
+          last_value?: number
+          org_id?: string
+          period_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plastics_document_sequences_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plastics_document_series: {
+        Row: {
+          doc_kind: string
+          is_self_numbered: boolean
+          org_id: string
+          prefix: string
+          updated_at: string
+        }
+        Insert: {
+          doc_kind: string
+          is_self_numbered?: boolean
+          org_id: string
+          prefix: string
+          updated_at?: string
+        }
+        Update: {
+          doc_kind?: string
+          is_self_numbered?: boolean
+          org_id?: string
+          prefix?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plastics_document_series_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plastics_document_taxes: {
+        Row: {
+          amount_minor: number
+          component_code: string
+          component_label: string
+          document_id: string
+          id: string
+          org_id: string
+          rate_pct: number
+        }
+        Insert: {
+          amount_minor: number
+          component_code: string
+          component_label: string
+          document_id: string
+          id?: string
+          org_id: string
+          rate_pct: number
+        }
+        Update: {
+          amount_minor?: number
+          component_code?: string
+          component_label?: string
+          document_id?: string
+          id?: string
+          org_id?: string
+          rate_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plastics_document_taxes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "plastics_document_balances"
+            referencedColumns: ["document_id"]
+          },
+          {
+            foreignKeyName: "plastics_document_taxes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "plastics_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_document_taxes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plastics_documents: {
+        Row: {
+          counterparty_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          direction: string
+          doc_date: string
+          doc_kind: string
+          doc_no: string | null
+          due_date: string | null
+          id: string
+          issued_snapshot: Json | null
+          notes: string | null
+          org_id: string
+          party_doc_no: string | null
+          pdf_path: string | null
+          status: string
+          tax_treatment: string
+          taxable_value_minor: number
+          total_minor: number
+        }
+        Insert: {
+          counterparty_id: string
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          direction: string
+          doc_date: string
+          doc_kind: string
+          doc_no?: string | null
+          due_date?: string | null
+          id?: string
+          issued_snapshot?: Json | null
+          notes?: string | null
+          org_id: string
+          party_doc_no?: string | null
+          pdf_path?: string | null
+          status?: string
+          tax_treatment?: string
+          taxable_value_minor: number
+          total_minor: number
+        }
+        Update: {
+          counterparty_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          direction?: string
+          doc_date?: string
+          doc_kind?: string
+          doc_no?: string | null
+          due_date?: string | null
+          id?: string
+          issued_snapshot?: Json | null
+          notes?: string | null
+          org_id?: string
+          party_doc_no?: string | null
+          pdf_path?: string | null
+          status?: string
+          tax_treatment?: string
+          taxable_value_minor?: number
+          total_minor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plastics_documents_counterparty_org_fk"
+            columns: ["counterparty_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "plastics_documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plastics_payments: {
+        Row: {
+          amount_minor: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          direction: string
+          id: string
+          method: string
+          org_id: string
+          paid_on: string
+          party_id: string
+          reference_no: string | null
+        }
+        Insert: {
+          amount_minor: number
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          direction: string
+          id?: string
+          method: string
+          org_id: string
+          paid_on: string
+          party_id: string
+          reference_no?: string | null
+        }
+        Update: {
+          amount_minor?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          direction?: string
+          id?: string
+          method?: string
+          org_id?: string
+          paid_on?: string
+          party_id?: string
+          reference_no?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plastics_payments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_payments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_payments_party_org_fk"
+            columns: ["party_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
           },
         ]
       }
@@ -1189,6 +2268,68 @@ export type Database = {
           },
         ]
       }
+      logistics_document_balances: {
+        Row: {
+          balance_due_minor: number | null
+          counterparty_id: string | null
+          currency: string | null
+          direction: string | null
+          doc_date: string | null
+          doc_kind: string | null
+          doc_no: string | null
+          document_id: string | null
+          due_date: string | null
+          org_id: string | null
+          party_doc_no: string | null
+          settled_minor: number | null
+          total_minor: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_documents_counterparty_org_fk"
+            columns: ["counterparty_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "logistics_documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logistics_payment_balances: {
+        Row: {
+          amount_minor: number | null
+          applied_minor: number | null
+          currency: string | null
+          direction: string | null
+          org_id: string | null
+          paid_on: string | null
+          party_id: string | null
+          payment_id: string | null
+          unapplied_minor: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logistics_payments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logistics_payments_party_org_fk"
+            columns: ["party_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
       party_outstanding: {
         Row: {
           amount_outstanding_minor: number | null
@@ -1265,6 +2406,68 @@ export type Database = {
           },
         ]
       }
+      plastics_document_balances: {
+        Row: {
+          balance_due_minor: number | null
+          counterparty_id: string | null
+          currency: string | null
+          direction: string | null
+          doc_date: string | null
+          doc_kind: string | null
+          doc_no: string | null
+          document_id: string | null
+          due_date: string | null
+          org_id: string | null
+          party_doc_no: string | null
+          settled_minor: number | null
+          total_minor: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plastics_documents_counterparty_org_fk"
+            columns: ["counterparty_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "plastics_documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plastics_payment_balances: {
+        Row: {
+          amount_minor: number | null
+          applied_minor: number | null
+          currency: string | null
+          direction: string | null
+          org_id: string | null
+          paid_on: string | null
+          party_id: string | null
+          payment_id: string | null
+          unapplied_minor: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plastics_payments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plastics_payments_party_org_fk"
+            columns: ["party_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
     }
     Functions: {
       allocate: {
@@ -1272,6 +2475,26 @@ export type Database = {
           p_amount_minor: number
           p_credit_document_id?: string
           p_payment_id?: string
+          p_target_document_id: string
+        }
+        Returns: {
+          allocation_id: string
+        }[]
+      }
+      allocate_logistics: {
+        Args: {
+          p_amount_minor: number
+          p_payment_id: string
+          p_target_document_id: string
+        }
+        Returns: {
+          allocation_id: string
+        }[]
+      }
+      allocate_plastics: {
+        Args: {
+          p_amount_minor: number
+          p_payment_id: string
           p_target_document_id: string
         }
         Returns: {
@@ -1358,7 +2581,53 @@ export type Database = {
           document_id: string
         }[]
       }
+      issue_logistics_document: {
+        Args: {
+          p_activity_ids?: string[]
+          p_counterparty_id: string
+          p_doc_date: string
+          p_doc_kind: string
+          p_due_date?: string
+          p_notes?: string
+          p_party_doc_no?: string
+          p_tax_treatment?: string
+          p_taxable_value_minor: number
+          p_taxes?: Json
+          p_total_minor: number
+        }
+        Returns: {
+          doc_no: string
+          document_id: string
+        }[]
+      }
+      issue_plastics_document: {
+        Args: {
+          p_activity_ids?: string[]
+          p_counterparty_id: string
+          p_doc_date: string
+          p_doc_kind: string
+          p_due_date?: string
+          p_notes?: string
+          p_party_doc_no?: string
+          p_tax_treatment?: string
+          p_taxable_value_minor: number
+          p_taxes?: Json
+          p_total_minor: number
+        }
+        Returns: {
+          doc_no: string
+          document_id: string
+        }[]
+      }
       next_doc_number: {
+        Args: { p_doc_date: string; p_doc_kind: string }
+        Returns: string
+      }
+      next_logistics_doc_number: {
+        Args: { p_doc_date: string; p_doc_kind: string }
+        Returns: string
+      }
+      next_plastics_doc_number: {
         Args: { p_doc_date: string; p_doc_kind: string }
         Returns: string
       }
@@ -1395,6 +2664,40 @@ export type Database = {
           activity_id: string
         }[]
       }
+      record_logistics_activity: {
+        Args: {
+          p_amount_minor: number
+          p_bill_to_party_id?: string
+          p_destination?: string
+          p_direct_cost_minor?: number
+          p_direction: string
+          p_load_type?: string
+          p_notes?: string
+          p_occurred_on: string
+          p_origin?: string
+          p_party_id: string
+          p_reference?: string
+          p_vehicle_no?: string
+          p_vendor_ref?: string
+        }
+        Returns: {
+          activity_id: string
+        }[]
+      }
+      record_logistics_payment: {
+        Args: {
+          p_allocations?: Json
+          p_amount_minor: number
+          p_direction: string
+          p_method: string
+          p_paid_on: string
+          p_party_id: string
+          p_reference_no?: string
+        }
+        Returns: {
+          payment_id: string
+        }[]
+      }
       record_payment: {
         Args: {
           p_allocations?: Json
@@ -1408,6 +2711,47 @@ export type Database = {
         }
         Returns: {
           payment_id: string
+        }[]
+      }
+      record_plastics_activity: {
+        Args: {
+          p_amount_minor: number
+          p_bill_to_party_id?: string
+          p_direct_cost_minor?: number
+          p_direction: string
+          p_grade?: string
+          p_material: string
+          p_net_weight_kg: number
+          p_notes?: string
+          p_occurred_on: string
+          p_party_id: string
+          p_rate_per_kg_minor: number
+          p_reference?: string
+          p_ticket_no?: string
+          p_vehicle_no?: string
+        }
+        Returns: {
+          activity_id: string
+        }[]
+      }
+      record_plastics_payment: {
+        Args: {
+          p_allocations?: Json
+          p_amount_minor: number
+          p_direction: string
+          p_method: string
+          p_paid_on: string
+          p_party_id: string
+          p_reference_no?: string
+        }
+        Returns: {
+          payment_id: string
+        }[]
+      }
+      set_activity_attachment: {
+        Args: { p_activity_id: string; p_attachment_path: string }
+        Returns: {
+          activity_id: string
         }[]
       }
       update_activity: {

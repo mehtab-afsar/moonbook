@@ -37,6 +37,7 @@ const updateSchema = z.object({
   period_start: z.iso.date().optional().nullable(),
   period_end: z.iso.date().optional().nullable(),
   status: z.enum(EDITABLE_ACTIVITY_STATUSES).default("completed"),
+  direct_cost_minor: z.number().int().min(0).optional().nullable(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -116,6 +117,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       p_period_end: v.period_end ?? undefined,
       p_notes: v.notes ?? undefined,
       p_status: v.status,
+      p_direct_cost_minor: v.direct_cost_minor ?? undefined,
     })
     .single();
 

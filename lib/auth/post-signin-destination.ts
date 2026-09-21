@@ -18,11 +18,24 @@ export async function postSignInDestination(
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return next;
 
+  // FK named: profiles reaches organisations by org_id, and an ambiguous
+  // embed is a PostgREST error rather than a guess.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, organisations!profiles_org_id_fkey(vertical)")
     .eq("id", userData.user.id)
     .maybeSingle();
 
-  return profile ? next : "/start";
+  if (!profile) return "/start";
+
+  // A forked-vertical org's data lives entirely outside the shared tables,
+  // so the default `next` (almost always /dashboard) would land it on a
+  // page that can never show anything true for it. Only the default is
+  // redirected — an explicit `next` (e.g. a deep link from /start) is
+  // still honoured as asked.
+  const vertical = profile.organisations?.vertical;
+  if (next === "/dashboard" && (vertical === "logistics" || vertical === "plastics")) {
+    return `/${vertical}/dashboard`;
+  }
+  return next;
 }

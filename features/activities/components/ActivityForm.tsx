@@ -24,6 +24,7 @@ export interface EditableActivity {
   occurred_on: string;
   reference: string | null;
   amount_minor: number;
+  direct_cost_minor: number | null;
   status: "pending" | "completed" | "cancelled";
   details: Record<string, unknown>;
 }
@@ -35,6 +36,15 @@ export interface ActivityTypeOption {
   pricing_strategy: "manual" | "flat" | "quantity_rate";
   pricing_config: Record<string, unknown>;
   activity_fields: ActivityField[];
+  /**
+   * Whether a margin computed from THIS activity's own revenue and cost
+   * means anything. False for a type where revenue and cost are period
+   * figures rather than one-to-one per record (scrap: what's bought Monday
+   * doesn't map to what's sold Friday) — the direct-cost field is hidden
+   * there rather than inviting a number that would print as a fabricated
+   * per-job margin.
+   */
+  uses_job_margin: boolean;
 }
 
 export function ActivityForm({
@@ -67,6 +77,9 @@ export function ActivityForm({
   const [manualAmount, setManualAmount] = useState(
     editing ? String(fromMinor(editing.amount_minor, currency)) : "",
   );
+  const [directCost, setDirectCost] = useState(
+    editing?.direct_cost_minor ? String(fromMinor(editing.direct_cost_minor, currency)) : "",
+  );
   const [details, setDetails] = useState<Record<string, unknown>>(editing?.details ?? {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -76,6 +89,17 @@ export function ActivityForm({
     () => (type?.activity_fields ?? []).filter((f) => !f.archived_at).sort(sortByOrder),
     [type],
   );
+  // Cost only means something against revenue, and only where a per-record
+  // margin is a real figure rather than a period one — see uses_job_margin.
+  const showCost = type?.direction === "receivable" && type?.uses_job_margin;
+  const directCostMinor = useMemo(() => {
+    if (!directCost.trim()) return null;
+    try {
+      return toMinor(Number(directCost), currency);
+    } catch {
+      return null;
+    }
+  }, [directCost, currency]);
 
   // A live preview of the amount, so the figure is never a surprise at save.
   const preview = useMemo(() => {
@@ -87,7 +111,12 @@ export function ActivityForm({
         details,
         manualAmountMinor: manualAmount ? toMinor(Number(manualAmount), currency) : undefined,
       });
-      return { text: formatMoney(amountMinor, currency, locale), explanation, error: null as string | null };
+      return {
+        text: formatMoney(amountMinor, currency, locale),
+        amountMinor,
+        explanation,
+        error: null as string | null,
+      };
     } catch (err) {
       return { text: null, explanation: "", error: err instanceof PricingError ? err.message : "—" };
     }
@@ -119,6 +148,7 @@ export function ActivityForm({
           reference: reference || null,
           details,
           amount_minor: manualAmount ? toMinor(Number(manualAmount), currency) : undefined,
+          direct_cost_minor: showCost ? directCostMinor : null,
           ...(editing ? { status: editing.status } : {}),
         }),
       },
@@ -134,6 +164,7 @@ export function ActivityForm({
       setDetails({});
       setReference("");
       setManualAmount("");
+      setDirectCost("");
       setBillToPartyId("");
     }
     onDone?.();
@@ -237,6 +268,17 @@ export function ActivityForm({
             />
           </Labelled>
         )}
+
+        {showCost && (
+          <Labelled label={`Direct cost (${currency}, optional)`} htmlFor="directCost">
+            <input
+              id="directCost" type="number" step="any" min="0" value={directCost}
+              onChange={(e) => setDirectCost(e.target.value)}
+              className={`${inputClass} font-mono`}
+              placeholder="What this cost to deliver"
+            />
+          </Labelled>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
@@ -245,6 +287,15 @@ export function ActivityForm({
             <>
               Amount: <span className="font-mono font-medium text-ink">{preview.text}</span>
               {preview.explanation && <span className="text-ink-3"> · {preview.explanation}</span>}
+              {showCost && directCostMinor !== null && (
+                <span className="text-ink-3">
+                  {" "}
+                  · Margin:{" "}
+                  <span className="font-mono font-medium text-ink">
+                    {formatMoney(preview.amountMinor - directCostMinor, currency, locale)}
+                  </span>
+                </span>
+              )}
             </>
           ) : (
             <span className="text-ink-3">{preview?.error}</span>
