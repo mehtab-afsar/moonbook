@@ -45,7 +45,6 @@ export function ReceiptPdf({ snapshot, logoDataUri }: { snapshot: ReceiptSnapsho
     <DocumentShell
       title={snapshot.direction === "in" ? "Payment Receipt" : "Payment Voucher"}
       docNo={receiptNo}
-      docDate={formatDate(snapshot.paid_on, locale)}
       org={snapshot.organisation}
       logoDataUri={logoDataUri}
     >

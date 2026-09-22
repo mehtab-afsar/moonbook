@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 // Billing, in the words businesses actually use for it — English and the
 // Hindi business-slang jargon ("vasooli" for chasing a payment, "hisaab" for
@@ -15,15 +15,29 @@ const GAP_MS = 250;
 
 type Phase = "typing" | "deleting";
 
+// Subscribed via useSyncExternalStore rather than read into state inside an
+// effect: that's the React-blessed way to mirror an external (browser) API,
+// it reacts live if the OS-level preference changes, and — the reason it's
+// here at all — a plain useEffect that calls setState on mount is exactly
+// the "derived state" anti-pattern react-hooks/set-state-in-effect flags.
+const QUERY = "(prefers-reduced-motion: reduce)";
+function subscribeReducedMotion(callback: () => void) {
+  const mql = window.matchMedia(QUERY);
+  mql.addEventListener("change", callback);
+  return () => mql.removeEventListener("change", callback);
+}
+function getReducedMotion() {
+  return window.matchMedia(QUERY).matches;
+}
+function getReducedMotionServer() {
+  return false;
+}
+
 export function TypingWord() {
   const [index, setIndex] = useState(0);
   const [length, setLength] = useState(0);
   const [phase, setPhase] = useState<Phase>("typing");
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
-    setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  }, []);
+  const reduced = useSyncExternalStore(subscribeReducedMotion, getReducedMotion, getReducedMotionServer);
 
   useEffect(() => {
     if (reduced) return;

@@ -25,17 +25,14 @@ export interface DocumentOrg {
 export function DocumentShell({
   title,
   docNo,
-  docDate,
   org,
   logoDataUri,
   children,
 }: {
   title: string;
-  /** Kept for the page's <Document> metadata; the number/date themselves
-   *  print in the body, next to Bill To, the way a printed invoice puts them —
-   *  not in the letterhead. */
+  /** The number/date print in the body, next to Bill To, the way a printed
+   *  invoice puts them — not in the letterhead. */
   docNo: string;
-  docDate: string;
   org: DocumentOrg;
   /** Only the organisation's own uploaded logo prints here; there is no
    *  placeholder mark when it has none, because a decorative shape is not

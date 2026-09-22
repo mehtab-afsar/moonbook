@@ -58,7 +58,6 @@ export function ClassicTemplate({ snapshot, logoDataUri, balance, invoiceOptions
     <DocumentShell
       title={TITLES[doc.doc_kind] ?? "Document"}
       docNo={doc.doc_no ?? doc.party_doc_no ?? "—"}
-      docDate={formatDate(doc.doc_date, locale)}
       org={organisation}
       logoDataUri={logoDataUri}
     >
