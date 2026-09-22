@@ -1,16 +1,13 @@
 import { test, expect } from "./fixtures";
 import { adminClient } from "./helpers/supabase";
 import { psql, lit } from "./helpers/psql";
-import { waitForSignInLink } from "./helpers/mailpit";
 
 /**
- * Signing up, through the real email.
+ * Signing up, through the real form.
  *
- * This is the ONE spec that waits on SMTP. Everywhere else a session is minted
- * directly, because forty specs depending on mail delivery buys no coverage
- * and loses reliability — but the link being sent, being redeemable, and
- * landing in the right place is itself a thing that can break, so it is tested
- * here properly rather than assumed.
+ * Auth is email + password (see EmailSignIn.tsx) — there is no magic link to
+ * wait on SMTP for any more, so this drives auth.signUp() through the actual
+ * UI directly, same as a real signup would.
  *
  * The other half of this file is the claim the whole product rests on: the
  * industries offered at signup are ROWS. A new one appears with no deploy.
@@ -35,17 +32,16 @@ test.describe("onboarding", () => {
       await expect(page).toHaveURL(/\/start/);
 
       await page.getByLabel("Email").fill(email);
-      await page.getByRole("button", { name: /Send me a sign-in link/i }).click();
-      await expect(page.getByText("Check your email.")).toBeVisible();
-
-      // The real link, out of the real inbox.
-      await page.goto(await waitForSignInLink(email));
+      await page.getByLabel("Password").fill("a very good password 8+");
+      await page.getByRole("button", { name: "Create account" }).click();
       await expect(page).toHaveURL(/\/start/);
 
-      // Setup asks four questions, and the one that matters is the industry.
+      // Setup is now three steps: industry, then the business's own details.
       await expect(page.getByText("What kind of business is this?")).toBeVisible();
-      await page.getByLabel("Business name").fill(orgName);
       await page.getByText("Freight & logistics").click();
+      await page.getByRole("button", { name: "Continue" }).click();
+
+      await page.getByLabel("Business name").fill(orgName);
       await page.getByLabel("Country").selectOption("IN");
       await page.getByLabel("State code").fill("KA");
       await page.getByRole("button", { name: "Finish setup" }).click();
@@ -107,8 +103,9 @@ test.describe("onboarding", () => {
     try {
       await page.goto("/start");
       await page.getByLabel("Email").fill(email);
-      await page.getByRole("button", { name: /Send me a sign-in link/i }).click();
-      await page.goto(await waitForSignInLink(email));
+      await page.getByLabel("Password").fill("a very good password 8+");
+      await page.getByRole("button", { name: "Create account" }).click();
+      await expect(page).toHaveURL(/\/start/);
 
       // No deploy, no migration, no code change — the picker simply has it.
       await expect(page.getByText("Beekeeping co-operative")).toBeVisible();

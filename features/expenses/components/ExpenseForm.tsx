@@ -15,10 +15,12 @@ export function ExpenseForm({
   parties,
   currency,
   today,
+  onDone,
 }: {
   parties: { id: string; name: string }[];
   currency: string;
   today: string;
+  onDone?: () => void;
 }) {
   const router = useRouter();
   const [category, setCategory] = useState("");
@@ -66,6 +68,7 @@ export function ExpenseForm({
 
     setSaving(false);
     setCategory(""); setDescription(""); setAmount(""); setPartyId("");
+    onDone?.();
     router.refresh();
   }
 

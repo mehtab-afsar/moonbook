@@ -50,6 +50,12 @@ create table if not exists public.plastics_activities (
   reference         text,
   notes             text,
   attachment_path   text,
+  -- Purely internal — which vendor/collector is actually handling this,
+  -- never printed on the counterparty's invoice. Same field as logistics'
+  -- assigned_vendor_id, same reasoning: a party with no billing history yet
+  -- reads as role "other", not "vendor", so this is what lets one be
+  -- assigned before their first bill exists.
+  assigned_vendor_id uuid references public.parties(id) on delete set null,
   status            text not null default 'completed'
                     constraint plastics_activities_status_chk
                     check (status in ('pending', 'completed', 'invoiced', 'cancelled')),
@@ -65,6 +71,8 @@ create table if not exists public.plastics_activities (
 );
 
 create index if not exists plastics_activities_org_idx on public.plastics_activities (org_id, occurred_on desc);
+create index if not exists plastics_activities_assigned_vendor_idx
+  on public.plastics_activities (assigned_vendor_id) where assigned_vendor_id is not null;
 
 comment on table public.plastics_activities is
   'Scrap & recycling: material bought (payable) and sold (receivable), priced by weight x rate.';
@@ -347,7 +355,8 @@ create or replace function public.record_plastics_activity(
   p_vehicle_no        text default null,
   p_reference         text default null,
   p_notes             text default null,
-  p_direct_cost_minor bigint default null
+  p_direct_cost_minor bigint default null,
+  p_assigned_vendor_id uuid default null
 )
 returns table (activity_id uuid)
 language plpgsql
@@ -373,6 +382,10 @@ begin
      and not exists (select 1 from public.parties where id = p_bill_to_party_id and org_id = v_org) then
     raise exception 'record_plastics_activity: bill-to party not found in your organisation' using errcode = 'P0002';
   end if;
+  if p_assigned_vendor_id is not null
+     and not exists (select 1 from public.parties where id = p_assigned_vendor_id and org_id = v_org) then
+    raise exception 'record_plastics_activity: assigned vendor not found in your organisation' using errcode = 'P0002';
+  end if;
   if p_amount_minor < 0 then
     raise exception 'record_plastics_activity: amount cannot be negative' using errcode = '22003';
   end if;
@@ -383,11 +396,11 @@ begin
   insert into public.plastics_activities (
     org_id, party_id, bill_to_party_id, direction, occurred_on, currency, amount_minor,
     direct_cost_minor, material, grade, net_weight_kg, rate_per_kg_minor, ticket_no, vehicle_no,
-    reference, notes, status, created_by
+    reference, notes, status, created_by, assigned_vendor_id
   )
   select v_org, p_party_id, p_bill_to_party_id, p_direction, p_occurred_on, o.base_currency, p_amount_minor,
          p_direct_cost_minor, p_material, p_grade, p_net_weight_kg, p_rate_per_kg_minor, p_ticket_no, p_vehicle_no,
-         nullif(p_reference, ''), nullif(p_notes, ''), 'completed', v_uid
+         nullif(p_reference, ''), nullif(p_notes, ''), 'completed', v_uid, p_assigned_vendor_id
     from public.organisations o where o.id = v_org
   returning id into v_id;
 
@@ -399,8 +412,8 @@ begin
 end;
 $$;
 
-revoke execute on function public.record_plastics_activity(text, uuid, date, bigint, text, numeric, bigint, uuid, text, text, text, text, text, bigint) from public;
-grant  execute on function public.record_plastics_activity(text, uuid, date, bigint, text, numeric, bigint, uuid, text, text, text, text, text, bigint) to authenticated;
+revoke execute on function public.record_plastics_activity(text, uuid, date, bigint, text, numeric, bigint, uuid, text, text, text, text, text, bigint, uuid) from public;
+grant  execute on function public.record_plastics_activity(text, uuid, date, bigint, text, numeric, bigint, uuid, text, text, text, text, text, bigint, uuid) to authenticated;
 
 create or replace function public.issue_plastics_document(
   p_doc_kind            text,

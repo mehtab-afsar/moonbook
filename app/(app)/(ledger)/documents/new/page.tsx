@@ -7,6 +7,7 @@ import {
   type BillableActivity,
   type PartyOption,
 } from "@/features/documents/components/IssueForm";
+import { computePartyRoles } from "@/lib/parties/roles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Issue an invoice" };
@@ -32,10 +33,10 @@ export default async function NewDocumentPage() {
   if (auth.ctx.role !== "owner") redirect("/documents");
 
   const supabase = await createClient();
-  const [{ data: org }, { data: parties }, { data: activities, error }, { data: fields }] =
+  const [{ data: org }, { data: parties }, { data: activities, error }, { data: fields }, { data: directions }] =
     await Promise.all([
       supabase.from("organisations").select("locale, timezone").eq("id", auth.ctx.orgId).single(),
-      supabase.from("parties").select("id, name, payment_terms_days").order("name"),
+      supabase.from("parties").select("id, name, payment_terms_days, kind").order("name"),
       supabase
         .from("activities")
         // Named FKs on both embeds: activities reaches activity_types by three
@@ -52,6 +53,7 @@ export default async function NewDocumentPage() {
         .not("org_id", "is", null)
         .eq("show_on_document", true)
         .order("sort_order"),
+      supabase.from("documents").select("counterparty_id, direction"),
     ]);
 
   if (error) throw new Error(`Could not load billable work: ${error.message}`);
@@ -86,6 +88,15 @@ export default async function NewDocumentPage() {
     });
   }
 
+  const roleByParty = computePartyRoles(
+    (directions ?? []) as { counterparty_id: string; direction: string }[],
+  );
+  const partiesWithRole = ((parties ?? []) as PartyOption[]).map((p) => ({
+    ...p,
+    role: roleByParty.get(p.id),
+    kind: p.kind as "client" | "vendor" | null,
+  }));
+
   // Today where the business is, not where the server is.
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: org?.timezone ?? "UTC",
@@ -93,7 +104,7 @@ export default async function NewDocumentPage() {
   }).format(new Date());
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="mx-auto max-w-[1200px] space-y-6 p-8">
       <header>
         <Link href="/documents" className="text-[13px] text-ink-2 hover:text-ink">
           ← Documents
@@ -108,7 +119,7 @@ export default async function NewDocumentPage() {
       </header>
 
       <IssueForm
-        parties={(parties ?? []) as PartyOption[]}
+        parties={partiesWithRole}
         activitiesByParty={byParty}
         locale={org?.locale ?? "en"}
         today={today}

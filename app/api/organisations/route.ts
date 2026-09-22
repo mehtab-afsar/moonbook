@@ -10,6 +10,16 @@ import { TAX_REGIMES } from "@/lib/domain";
 
 export const runtime = "nodejs";
 
+/**
+ * Templates that fork the org off the shared ledger onto their own vertical
+ * app at signup. Every other template_key (hospitality, wholesale, generic,
+ * …) stays on vertical = 'shared'. See migration 29, activate_vertical().
+ */
+const TEMPLATE_VERTICAL: Record<string, "logistics" | "plastics"> = {
+  freight: "logistics",
+  scrap: "plastics",
+};
+
 const createOrganisationSchema = z.object({
   legal_name: z.string().trim().min(2, "business name is required").max(200),
   country_code: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "must be a 2-letter country code"),
@@ -84,5 +94,23 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  return apiOk({ ...data, template_applied: !templateError }, 201);
+  // Some templates (freight, scrap) fork the org onto their own vertical
+  // ledger and app — a third call, for the same reason apply_industry_template
+  // is separate from create_organisation: a business whose vertical activation
+  // fails still has a usable organisation on the shared ledger.
+  const vertical = TEMPLATE_VERTICAL[v.template_key];
+  let activatedVertical: string | null = null;
+  if (vertical) {
+    const { error: verticalError } = await supabase.rpc("activate_vertical", { p_vertical: vertical });
+    if (verticalError) {
+      log.warn("POST /api/organisations: vertical not activated", {
+        err: verticalError.message,
+        vertical,
+      });
+    } else {
+      activatedVertical = vertical;
+    }
+  }
+
+  return apiOk({ ...data, template_applied: !templateError, vertical: activatedVertical ?? "shared" }, 201);
 }

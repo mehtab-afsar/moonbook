@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { Search } from "lucide-react";
 import { formatMoney } from "@/lib/money";
+import { searchInputClass } from "@/lib/ui/styles";
 import {
   ActivityForm,
   type ActivityTypeOption,
   type EditableActivity,
 } from "@/features/activities/components/ActivityForm";
 import { AttachmentButton } from "@/features/activities/components/AttachmentButton";
+import type { PartyRole } from "@/lib/parties/roles";
 
 /**
  * The log, with a correction path.
@@ -45,19 +49,35 @@ export function ActivityLog({
   rows,
   currency,
   locale,
+  showForm,
+  onShowFormChange,
 }: {
   types: ActivityTypeOption[];
-  parties: { id: string; name: string }[];
+  parties: { id: string; name: string; role?: PartyRole }[];
   rows: LogRow[];
   currency: string;
   locale: string;
+  /** Lifted to the page header, next to the title — same row Documents puts "Issue an invoice" in. */
+  showForm: boolean;
+  onShowFormChange: (showForm: boolean) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const row = rows.find((r) => r.id === editingId);
   // Narrowed rather than cast: only a row that is not invoiced can be edited,
   // and the type says so, so an `invoiced` row cannot reach the form at all.
   const editing =
     row && row.status !== "invoiced" ? { ...row, status: row.status } : undefined;
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      [r.type_label, r.party_name, r.reference, r.dim1_value]
+        .filter((v): v is string => Boolean(v))
+        .some((v) => v.toLowerCase().includes(q)),
+    );
+  }, [rows, search]);
 
   return (
     <div className="space-y-6">
@@ -77,7 +97,27 @@ export function ActivityLog({
           />
         </div>
       ) : (
-        <ActivityForm types={types} parties={parties} currency={currency} locale={locale} />
+        <div className="space-y-4">
+          <div className="relative min-w-[240px] max-w-[400px]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-3" strokeWidth={1.75} />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search activities…"
+              className={searchInputClass}
+            />
+          </div>
+          {showForm && (
+            <ActivityForm
+              types={types}
+              parties={parties}
+              currency={currency}
+              locale={locale}
+              onDone={() => onShowFormChange(false)}
+            />
+          )}
+        </div>
       )}
 
       <div className="overflow-x-auto rounded-[10px] border border-line bg-white">
@@ -95,18 +135,20 @@ export function ActivityLog({
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 && (
+            {filteredRows.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-5 py-10 text-center text-ink-3">
-                  Nothing recorded yet.
+                  {rows.length === 0 ? "Nothing recorded yet." : "No activities match your search."}
                 </td>
               </tr>
             )}
-            {rows.map((r) => (
-              <tr key={r.id} className="border-b border-line-soft last:border-b-0">
+            {filteredRows.map((r) => (
+              <tr key={r.id} className="border-b border-line-soft last:border-b-0 hover:bg-paper">
                 <td className="px-5 py-3 font-mono text-ink-2">{r.occurred_on}</td>
                 <td className="px-5 py-3 text-ink">
-                  {r.type_label}
+                  <Link href={`/activities/${r.id}`} className="font-medium text-brand hover:underline">
+                    {r.type_label}
+                  </Link>
                   {r.dim1_value && <span className="ml-2 text-ink-3">· {r.dim1_value}</span>}
                 </td>
                 <td className="px-5 py-3 font-medium text-ink">{r.party_name}</td>

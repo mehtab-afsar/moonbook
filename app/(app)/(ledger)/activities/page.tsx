@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { verifyAuth } from "@/lib/auth/verify";
 import type { ActivityTypeOption } from "@/features/activities/components/ActivityForm";
-import { ActivityLog, type LogRow } from "@/features/activities/components/ActivityLog";
+import type { LogRow } from "@/features/activities/components/ActivityLog";
+import { ActivitiesPageClient } from "@/features/activities/components/ActivitiesPageClient";
+import { computePartyRoles } from "@/lib/parties/roles";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Activity log" };
@@ -17,6 +19,7 @@ export default async function ActivitiesPage() {
     { data: types, error: typesError },
     { data: parties },
     { data: activities, error: activitiesError },
+    { data: directions },
   ] = await Promise.all([
     supabase.from("organisations").select("base_currency, locale").eq("id", auth.ctx.orgId).single(),
     supabase
@@ -31,7 +34,7 @@ export default async function ActivitiesPage() {
       .not("org_id", "is", null)
       .is("archived_at", null)
       .order("sort_order"),
-    supabase.from("parties").select("id, name").order("name"),
+    supabase.from("parties").select("id, name, kind").order("name"),
     supabase
       .from("activities")
       // Both embeds name their key. activities reaches activity_types by
@@ -39,10 +42,11 @@ export default async function ActivitiesPage() {
       // pin direction and org) and parties by two (party_id and
       // bill_to_party_id). Unnamed, either is an ambiguous-embed ERROR.
       .select(
-        "id, activity_type_id, party_id, bill_to_party_id, occurred_on, amount_minor, direct_cost_minor, attachment_path, currency, reference, status, details, dim1_key, dim1_value, activity_types!activities_activity_type_id_fkey(label_singular, uses_job_margin), parties!activities_party_id_fkey(name)",
+        "id, activity_type_id, party_id, bill_to_party_id, occurred_on, amount_minor, direct_cost_minor, tax_rate_pct, attachment_path, currency, reference, status, details, dim1_key, dim1_value, activity_types!activities_activity_type_id_fkey(label_singular, uses_job_margin), parties!activities_party_id_fkey(name)",
       )
       .order("occurred_on", { ascending: false })
       .limit(100),
+    supabase.from("documents").select("counterparty_id, direction"),
   ]);
 
   // Surfaced rather than swallowed: an empty list and a failed query look
@@ -52,12 +56,18 @@ export default async function ActivitiesPage() {
 
   const currency = org?.base_currency ?? "USD";
   const locale = org?.locale ?? "en";
+  const roleByParty = computePartyRoles(
+    (directions ?? []) as { counterparty_id: string; direction: string }[],
+  );
+  const partiesWithRole = (parties ?? []).map((p) => ({
+    ...p, role: roleByParty.get(p.id), kind: p.kind as "client" | "vendor" | null,
+  }));
 
   const rows: LogRow[] = (activities ?? []).map((a) => {
     const row = a as unknown as {
       id: string; activity_type_id: string; party_id: string;
       bill_to_party_id: string | null; occurred_on: string;
-      amount_minor: number; direct_cost_minor: number | null;
+      amount_minor: number; direct_cost_minor: number | null; tax_rate_pct: number | null;
       attachment_path: string | null;
       currency: string; reference: string | null; status: string;
       details: Record<string, unknown> | null; dim1_value: string | null;
@@ -73,6 +83,7 @@ export default async function ActivitiesPage() {
       reference: row.reference,
       amount_minor: row.amount_minor,
       direct_cost_minor: row.direct_cost_minor,
+      tax_rate_pct: row.tax_rate_pct,
       attachment_path: row.attachment_path,
       status: row.status as LogRow["status"],
       details: row.details ?? {},
@@ -85,18 +96,10 @@ export default async function ActivitiesPage() {
   });
 
   return (
-    <div className="space-y-6 p-8">
-      <header>
-        <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Activity log</h1>
-        <p className="mt-1 text-[13.5px] text-ink-2">
-          What this business actually did. The fields below come from how you&apos;ve set your
-          activity types up — they are not the same for every business on Moonbook.
-        </p>
-      </header>
-
-      <ActivityLog
+    <div className="mx-auto max-w-[1200px] space-y-6 p-8">
+      <ActivitiesPageClient
         types={(types ?? []) as unknown as ActivityTypeOption[]}
-        parties={parties ?? []}
+        parties={partiesWithRole}
         rows={rows}
         currency={currency}
         locale={locale}

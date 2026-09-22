@@ -57,6 +57,7 @@ export type Database = {
           period_start: string | null
           reference: string | null
           status: string
+          tax_rate_pct: number | null
           updated_at: string
         }
         Insert: {
@@ -81,6 +82,7 @@ export type Database = {
           period_start?: string | null
           reference?: string | null
           status?: string
+          tax_rate_pct?: number | null
           updated_at?: string
         }
         Update: {
@@ -105,6 +107,7 @@ export type Database = {
           period_start?: string | null
           reference?: string | null
           status?: string
+          tax_rate_pct?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -226,6 +229,147 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "activity_types"
             referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      activity_link_types: {
+        Row: {
+          aggregate: string
+          archived_at: string | null
+          created_at: string
+          from_activity_type_id: string
+          id: string
+          key: string
+          label: string
+          org_id: string | null
+          sort_order: number
+          to_activity_type_id: string
+        }
+        Insert: {
+          aggregate?: string
+          archived_at?: string | null
+          created_at?: string
+          from_activity_type_id: string
+          id?: string
+          key: string
+          label: string
+          org_id?: string | null
+          sort_order?: number
+          to_activity_type_id: string
+        }
+        Update: {
+          aggregate?: string
+          archived_at?: string | null
+          created_at?: string
+          from_activity_type_id?: string
+          id?: string
+          key?: string
+          label?: string
+          org_id?: string | null
+          sort_order?: number
+          to_activity_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_link_types_from_org_fk"
+            columns: ["from_activity_type_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "activity_types"
+            referencedColumns: ["id", "org_id"]
+          },
+          {
+            foreignKeyName: "activity_link_types_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_link_types_to_org_fk"
+            columns: ["to_activity_type_id", "org_id"]
+            isOneToOne: false
+            referencedRelation: "activity_types"
+            referencedColumns: ["id", "org_id"]
+          },
+        ]
+      }
+      activity_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          from_activity_id: string
+          id: string
+          link_type_id: string
+          org_id: string
+          to_activity_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          from_activity_id: string
+          id?: string
+          link_type_id: string
+          org_id: string
+          to_activity_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          from_activity_id?: string
+          id?: string
+          link_type_id?: string
+          org_id?: string
+          to_activity_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_links_from_activity_id_fkey"
+            columns: ["from_activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_links_from_activity_id_fkey"
+            columns: ["from_activity_id"]
+            isOneToOne: false
+            referencedRelation: "activity_margin"
+            referencedColumns: ["activity_id"]
+          },
+          {
+            foreignKeyName: "activity_links_link_type_id_fkey"
+            columns: ["link_type_id"]
+            isOneToOne: false
+            referencedRelation: "activity_link_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_links_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_links_to_activity_id_fkey"
+            columns: ["to_activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_links_to_activity_id_fkey"
+            columns: ["to_activity_id"]
+            isOneToOne: false
+            referencedRelation: "activity_margin"
+            referencedColumns: ["activity_id"]
           },
         ]
       }
@@ -466,6 +610,7 @@ export type Database = {
           quantity: number | null
           rate_minor: number | null
           sort_order: number
+          tax_rate_pct: number | null
           unit: string | null
         }
         Insert: {
@@ -481,6 +626,7 @@ export type Database = {
           quantity?: number | null
           rate_minor?: number | null
           sort_order?: number
+          tax_rate_pct?: number | null
           unit?: string | null
         }
         Update: {
@@ -496,6 +642,7 @@ export type Database = {
           quantity?: number | null
           rate_minor?: number | null
           sort_order?: number
+          tax_rate_pct?: number | null
           unit?: string | null
         }
         Relationships: [
@@ -624,6 +771,7 @@ export type Database = {
           org_id: string
           rate_pct: number
           sort_order: number
+          taxable_value_minor: number
         }
         Insert: {
           amount_minor: number
@@ -635,6 +783,7 @@ export type Database = {
           org_id: string
           rate_pct: number
           sort_order?: number
+          taxable_value_minor?: number
         }
         Update: {
           amount_minor?: number
@@ -646,6 +795,7 @@ export type Database = {
           org_id?: string
           rate_pct?: number
           sort_order?: number
+          taxable_value_minor?: number
         }
         Relationships: [
           {
@@ -691,7 +841,13 @@ export type Database = {
           doc_kind: string
           doc_no: string | null
           due_date: string | null
+          einvoice_status: string
+          ewb_no: string | null
+          ewb_valid_until: string | null
           id: string
+          irn: string | null
+          irn_ack_date: string | null
+          irn_ack_no: string | null
           is_disputed: boolean
           issued_snapshot: Json | null
           notes: string | null
@@ -699,6 +855,7 @@ export type Database = {
           org_id: string
           party_doc_no: string | null
           pdf_path: string | null
+          qr_code_data: string | null
           round_off_minor: number
           ship_to_party_id: string | null
           status: string
@@ -719,7 +876,13 @@ export type Database = {
           doc_kind: string
           doc_no?: string | null
           due_date?: string | null
+          einvoice_status?: string
+          ewb_no?: string | null
+          ewb_valid_until?: string | null
           id?: string
+          irn?: string | null
+          irn_ack_date?: string | null
+          irn_ack_no?: string | null
           is_disputed?: boolean
           issued_snapshot?: Json | null
           notes?: string | null
@@ -727,6 +890,7 @@ export type Database = {
           org_id: string
           party_doc_no?: string | null
           pdf_path?: string | null
+          qr_code_data?: string | null
           round_off_minor?: number
           ship_to_party_id?: string | null
           status?: string
@@ -747,7 +911,13 @@ export type Database = {
           doc_kind?: string
           doc_no?: string | null
           due_date?: string | null
+          einvoice_status?: string
+          ewb_no?: string | null
+          ewb_valid_until?: string | null
           id?: string
+          irn?: string | null
+          irn_ack_date?: string | null
+          irn_ack_no?: string | null
           is_disputed?: boolean
           issued_snapshot?: Json | null
           notes?: string | null
@@ -755,6 +925,7 @@ export type Database = {
           org_id?: string
           party_doc_no?: string | null
           pdf_path?: string | null
+          qr_code_data?: string | null
           round_off_minor?: number
           ship_to_party_id?: string | null
           status?: string
@@ -879,6 +1050,57 @@ export type Database = {
           },
         ]
       }
+      gstn_connections: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          environment: string
+          gstin: string
+          org_id: string
+          provider: string
+          status: string
+          status_note: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          gstin: string
+          org_id: string
+          provider: string
+          status?: string
+          status_note?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          gstin?: string
+          org_id?: string
+          provider?: string
+          status?: string
+          status_note?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gstn_connections_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gstn_connections_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       industry_templates: {
         Row: {
           created_at: string
@@ -906,6 +1128,7 @@ export type Database = {
       logistics_activities: {
         Row: {
           amount_minor: number
+          assigned_vendor_id: string | null
           attachment_path: string | null
           bill_to_party_id: string | null
           created_at: string
@@ -914,6 +1137,7 @@ export type Database = {
           destination: string | null
           direct_cost_minor: number | null
           direction: string
+          distance_km: number | null
           id: string
           load_type: string | null
           notes: string | null
@@ -929,6 +1153,7 @@ export type Database = {
         }
         Insert: {
           amount_minor: number
+          assigned_vendor_id?: string | null
           attachment_path?: string | null
           bill_to_party_id?: string | null
           created_at?: string
@@ -937,6 +1162,7 @@ export type Database = {
           destination?: string | null
           direct_cost_minor?: number | null
           direction: string
+          distance_km?: number | null
           id?: string
           load_type?: string | null
           notes?: string | null
@@ -952,6 +1178,7 @@ export type Database = {
         }
         Update: {
           amount_minor?: number
+          assigned_vendor_id?: string | null
           attachment_path?: string | null
           bill_to_party_id?: string | null
           created_at?: string
@@ -960,6 +1187,7 @@ export type Database = {
           destination?: string | null
           direct_cost_minor?: number | null
           direction?: string
+          distance_km?: number | null
           id?: string
           load_type?: string | null
           notes?: string | null
@@ -974,6 +1202,13 @@ export type Database = {
           vendor_ref?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "logistics_activities_assigned_vendor_id_fkey"
+            columns: ["assigned_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "logistics_activities_bill_to_org_fk"
             columns: ["bill_to_party_id", "org_id"]
@@ -1411,6 +1646,54 @@ export type Database = {
           },
         ]
       }
+      org_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string | null
+          org_id: string
+          role: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          org_id: string
+          role?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string | null
+          org_id?: string
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_invites_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_invites_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organisations: {
         Row: {
           address: string | null
@@ -1421,8 +1704,12 @@ export type Database = {
           default_tax_rate_pct: number
           fiscal_year_start_month: number
           id: string
+          invoice_show_hsn: boolean
+          invoice_template: string
+          invoice_terms: string | null
           legal_name: string
           locale: string
+          logo_path: string | null
           region_code: string | null
           tax_id: string | null
           tax_id_kind: string | null
@@ -1440,8 +1727,12 @@ export type Database = {
           default_tax_rate_pct?: number
           fiscal_year_start_month?: number
           id?: string
+          invoice_show_hsn?: boolean
+          invoice_template?: string
+          invoice_terms?: string | null
           legal_name: string
           locale?: string
+          logo_path?: string | null
           region_code?: string | null
           tax_id?: string | null
           tax_id_kind?: string | null
@@ -1459,8 +1750,12 @@ export type Database = {
           default_tax_rate_pct?: number
           fiscal_year_start_month?: number
           id?: string
+          invoice_show_hsn?: boolean
+          invoice_template?: string
+          invoice_terms?: string | null
           legal_name?: string
           locale?: string
+          logo_path?: string | null
           region_code?: string | null
           tax_id?: string | null
           tax_id_kind?: string | null
@@ -1480,10 +1775,15 @@ export type Database = {
           credit_limit_minor: number | null
           email: string | null
           id: string
+          kind: string | null
           name: string
           notes: string | null
           org_id: string
           payment_terms_days: number
+          payout_account_no: string | null
+          payout_bank_name: string | null
+          payout_ifsc_or_routing: string | null
+          payout_upi_id: string | null
           phone: string | null
           region_code: string | null
           tax_id: string | null
@@ -1498,10 +1798,15 @@ export type Database = {
           credit_limit_minor?: number | null
           email?: string | null
           id?: string
+          kind?: string | null
           name: string
           notes?: string | null
           org_id: string
           payment_terms_days?: number
+          payout_account_no?: string | null
+          payout_bank_name?: string | null
+          payout_ifsc_or_routing?: string | null
+          payout_upi_id?: string | null
           phone?: string | null
           region_code?: string | null
           tax_id?: string | null
@@ -1516,10 +1821,15 @@ export type Database = {
           credit_limit_minor?: number | null
           email?: string | null
           id?: string
+          kind?: string | null
           name?: string
           notes?: string | null
           org_id?: string
           payment_terms_days?: number
+          payout_account_no?: string | null
+          payout_bank_name?: string | null
+          payout_ifsc_or_routing?: string | null
+          payout_upi_id?: string | null
           phone?: string | null
           region_code?: string | null
           tax_id?: string | null
@@ -1616,6 +1926,7 @@ export type Database = {
       plastics_activities: {
         Row: {
           amount_minor: number
+          assigned_vendor_id: string | null
           attachment_path: string | null
           bill_to_party_id: string | null
           created_at: string
@@ -1640,6 +1951,7 @@ export type Database = {
         }
         Insert: {
           amount_minor: number
+          assigned_vendor_id?: string | null
           attachment_path?: string | null
           bill_to_party_id?: string | null
           created_at?: string
@@ -1664,6 +1976,7 @@ export type Database = {
         }
         Update: {
           amount_minor?: number
+          assigned_vendor_id?: string | null
           attachment_path?: string | null
           bill_to_party_id?: string | null
           created_at?: string
@@ -1687,6 +2000,13 @@ export type Database = {
           vehicle_no?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "plastics_activities_assigned_vendor_id_fkey"
+            columns: ["assigned_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "plastics_activities_bill_to_org_fk"
             columns: ["bill_to_party_id", "org_id"]
@@ -2470,6 +2790,56 @@ export type Database = {
       }
     }
     Functions: {
+      accept_org_invite: {
+        Args: never
+        Returns: {
+          org_id: string
+          role: string
+        }[]
+      }
+      activate_vertical: { Args: { p_vertical: string }; Returns: undefined }
+      add_activity_field: {
+        Args: {
+          p_activity_type_id: string
+          p_field_type: string
+          p_is_reportable?: boolean
+          p_is_required?: boolean
+          p_key: string
+          p_label: string
+          p_options?: Json
+          p_show_on_document?: boolean
+        }
+        Returns: {
+          field_id: string
+        }[]
+      }
+      add_activity_link_type: {
+        Args: {
+          p_aggregate?: string
+          p_from_activity_type_id: string
+          p_key: string
+          p_label: string
+          p_to_activity_type_id: string
+        }
+        Returns: {
+          link_type_id: string
+        }[]
+      }
+      add_activity_type: {
+        Args: {
+          p_direction: string
+          p_key: string
+          p_label_plural: string
+          p_label_singular: string
+          p_pricing_config?: Json
+          p_pricing_strategy?: string
+          p_uses_job_margin?: boolean
+          p_uses_period?: boolean
+        }
+        Returns: {
+          activity_type_id: string
+        }[]
+      }
       allocate: {
         Args: {
           p_amount_minor: number
@@ -2507,10 +2877,34 @@ export type Database = {
           types_added: number
         }[]
       }
+      archive_activity_field: {
+        Args: { p_field_id: string }
+        Returns: {
+          field_id: string
+        }[]
+      }
+      archive_activity_link_type: {
+        Args: { p_link_type_id: string }
+        Returns: {
+          link_type_id: string
+        }[]
+      }
+      archive_activity_type: {
+        Args: { p_activity_type_id: string }
+        Returns: {
+          activity_type_id: string
+        }[]
+      }
       cancel_document: {
         Args: { p_document_id: string; p_reason: string }
         Returns: {
           document_id: string
+        }[]
+      }
+      cancel_org_invite: {
+        Args: { p_invite_id: string }
+        Returns: {
+          invite_id: string
         }[]
       }
       create_organisation: {
@@ -2619,6 +3013,16 @@ export type Database = {
           document_id: string
         }[]
       }
+      link_activities: {
+        Args: {
+          p_from_activity_id: string
+          p_link_type_id: string
+          p_to_activity_id: string
+        }
+        Returns: {
+          link_id: string
+        }[]
+      }
       next_doc_number: {
         Args: { p_doc_date: string; p_doc_kind: string }
         Returns: string
@@ -2659,6 +3063,7 @@ export type Database = {
           p_period_start?: string
           p_reference?: string
           p_status?: string
+          p_tax_rate_pct?: number
         }
         Returns: {
           activity_id: string
@@ -2667,10 +3072,12 @@ export type Database = {
       record_logistics_activity: {
         Args: {
           p_amount_minor: number
+          p_assigned_vendor_id?: string
           p_bill_to_party_id?: string
           p_destination?: string
           p_direct_cost_minor?: number
           p_direction: string
+          p_distance_km?: number
           p_load_type?: string
           p_notes?: string
           p_occurred_on: string
@@ -2716,6 +3123,7 @@ export type Database = {
       record_plastics_activity: {
         Args: {
           p_amount_minor: number
+          p_assigned_vendor_id?: string
           p_bill_to_party_id?: string
           p_direct_cost_minor?: number
           p_direction: string
@@ -2754,6 +3162,63 @@ export type Database = {
           activity_id: string
         }[]
       }
+      set_document_compliance_refs: {
+        Args: {
+          p_document_id: string
+          p_einvoice_status?: string
+          p_ewb_no?: string
+          p_ewb_valid_until?: string
+          p_irn?: string
+          p_irn_ack_date?: string
+          p_irn_ack_no?: string
+          p_qr_code_data?: string
+        }
+        Returns: {
+          document_id: string
+        }[]
+      }
+      set_gstn_connection: {
+        Args: { p_environment: string; p_gstin: string; p_provider: string }
+        Returns: {
+          out_org_id: string
+        }[]
+      }
+      set_logistics_activity_attachment: {
+        Args: { p_activity_id: string; p_attachment_path: string }
+        Returns: {
+          activity_id: string
+        }[]
+      }
+      set_org_invoice_customization: {
+        Args: { p_show_hsn: boolean; p_terms?: string }
+        Returns: {
+          org_id: string
+        }[]
+      }
+      set_org_invoice_template: {
+        Args: { p_template: string }
+        Returns: {
+          org_id: string
+        }[]
+      }
+      set_org_logo: {
+        Args: { p_logo_path: string }
+        Returns: {
+          org_id: string
+        }[]
+      }
+      set_plastics_activity_attachment: {
+        Args: { p_activity_id: string; p_attachment_path: string }
+        Returns: {
+          activity_id: string
+        }[]
+      }
+      unlink_activities: {
+        Args: { p_link_id: string }
+        Returns: {
+          link_id: string
+        }[]
+      }
       update_activity: {
         Args: {
           p_activity_id: string
@@ -2768,9 +3233,37 @@ export type Database = {
           p_period_start?: string
           p_reference?: string
           p_status?: string
+          p_tax_rate_pct?: number
         }
         Returns: {
           activity_id: string
+        }[]
+      }
+      update_activity_field: {
+        Args: {
+          p_field_id: string
+          p_is_reportable?: boolean
+          p_is_required?: boolean
+          p_label: string
+          p_options?: Json
+          p_show_on_document?: boolean
+        }
+        Returns: {
+          field_id: string
+        }[]
+      }
+      update_activity_type: {
+        Args: {
+          p_activity_type_id: string
+          p_label_plural: string
+          p_label_singular: string
+          p_pricing_config?: Json
+          p_pricing_strategy?: string
+          p_uses_job_margin?: boolean
+          p_uses_period?: boolean
+        }
+        Returns: {
+          activity_type_id: string
         }[]
       }
     }

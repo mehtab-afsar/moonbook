@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/money";
 import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
 import { PLASTICS_GRADES } from "@/lib/domain";
+import { filterPartiesForKind, type PartyRole } from "@/lib/parties/roles";
+import { PartyCombobox } from "@/features/parties/components/PartyCombobox";
 
 const MATERIALS_IN = ["PET", "HDPE", "LDPE", "PP", "Mixed plastic", "Cardboard", "Ferrous", "Aluminium", "Copper"];
 const MATERIALS_OUT = ["PET flake", "HDPE flake", "LDPE flake", "PP granule", "Baled cardboard", "Ferrous", "Aluminium", "Copper"];
@@ -20,10 +22,12 @@ export function ActivityForm({
   parties,
   currency,
   locale,
+  onDone,
 }: {
-  parties: { id: string; name: string }[];
+  parties: { id: string; name: string; role?: PartyRole; kind?: "client" | "vendor" | null }[];
   currency: string;
   locale: string;
+  onDone?: () => void;
 }) {
   const router = useRouter();
   const [direction, setDirection] = useState<"payable" | "receivable">("payable");
@@ -37,9 +41,19 @@ export function ActivityForm({
   const [ticketNo, setTicketNo] = useState("");
   const [vehicleNo, setVehicleNo] = useState("");
   const [reference, setReference] = useState("");
+  const [assignedVendorId, setAssignedVendorId] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Purchase (payable) owes a vendor (a collector); Sale (receivable) bills
+  // a client — the party picker follows direction, never mixing the two.
+  const eligibleParties = useMemo(
+    () => filterPartiesForKind(parties, direction === "payable" ? "vendor" : "client"),
+    [parties, direction],
+  );
+  // Who's actually handling this — a hauler or agent, distinct from the
+  // counterparty above. Purely internal, same field logistics has.
+  const vendorParties = useMemo(() => filterPartiesForKind(parties, "vendor"), [parties]);
   const materials = direction === "payable" ? MATERIALS_IN : MATERIALS_OUT;
   const weight = Number(netWeightKg);
   const rate = Number(ratePerKg);
@@ -60,6 +74,7 @@ export function ActivityForm({
         vehicle_no: direction === "receivable" ? vehicleNo || null : null,
         direct_cost_minor: null,
         reference: reference || null,
+        assigned_vendor_id: assignedVendorId || null,
       }),
     });
     const body = await res.json();
@@ -67,7 +82,8 @@ export function ActivityForm({
     if (!res.ok) { setError(body.error ?? "Could not record this."); return; }
     setPartyId(""); setBillToPartyId(""); setMaterial(""); setGrade("");
     setNetWeightKg(""); setRatePerKg(""); setTicketNo(""); setVehicleNo("");
-    setReference("");
+    setReference(""); setAssignedVendorId("");
+    onDone?.();
     router.refresh();
   }
 
@@ -83,13 +99,13 @@ export function ActivityForm({
         <Labelled label="Party" htmlFor="party">
           <select id="party" required value={partyId} onChange={(e) => setPartyId(e.target.value)} className={inputClass}>
             <option value="">Select…</option>
-            {parties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {eligibleParties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Labelled>
         <Labelled label="Bill to (if different)" htmlFor="billTo">
           <select id="billTo" value={billToPartyId} onChange={(e) => setBillToPartyId(e.target.value)} className={inputClass}>
             <option value="">Same as party</option>
-            {parties.filter((p) => p.id !== partyId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {eligibleParties.filter((p) => p.id !== partyId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Labelled>
       </div>
@@ -133,6 +149,13 @@ export function ActivityForm({
       <div className="grid gap-3 border-t border-line-soft pt-4 min-[640px]:grid-cols-2">
         <Labelled label="Reference (optional)" htmlFor="ref">
           <input id="ref" value={reference} onChange={(e) => setReference(e.target.value)} className={inputClass} />
+        </Labelled>
+        <Labelled label="Assigned vendor (optional, internal only)" htmlFor="assignedVendor">
+          <PartyCombobox
+            id="assignedVendor" parties={vendorParties}
+            value={assignedVendorId} onChange={setAssignedVendorId}
+            placeholder="Not assigned yet"
+          />
         </Labelled>
       </div>
 

@@ -2,19 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { verifyAuth } from "@/lib/auth/verify";
-import { formatMoney } from "@/lib/money";
-import { attachBalances, settlementLabel } from "@/lib/documents/with-balances";
+import { attachBalances } from "@/lib/documents/with-balances";
 import { buttonPrimaryClass, buttonSecondaryClass } from "@/lib/ui/styles";
+import { DocumentsTable, type DocumentRow } from "@/features/documents/components/DocumentsTable";
+import { Gstr1ExportButton } from "@/features/documents/components/Gstr1ExportButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Documents" };
-
-const TONE: Record<string, string> = {
-  settled: "bg-settled-tint text-settled-ink",
-  pending: "bg-pending-tint text-pending-ink",
-  overdue: "bg-overdue-tint text-overdue",
-  muted: "bg-line-soft text-ink-2",
-};
 
 const KIND_LABEL: Record<string, string> = {
   invoice: "Invoice",
@@ -29,7 +23,7 @@ export default async function DocumentsPage() {
 
   const supabase = await createClient();
   const [{ data: org }, { data: documents, error }] = await Promise.all([
-    supabase.from("organisations").select("locale").eq("id", auth.ctx.orgId).single(),
+    supabase.from("organisations").select("locale, tax_regime, tax_id").eq("id", auth.ctx.orgId).single(),
     supabase
       .from("documents")
       // The embed names its key: documents reaches parties by both
@@ -50,7 +44,7 @@ export default async function DocumentsPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="space-y-6 p-8">
+    <div className="mx-auto max-w-[1200px] space-y-6 p-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Documents</h1>
@@ -60,6 +54,10 @@ export default async function DocumentsPage() {
           </p>
         </div>
         <div className="flex gap-3">
+          <a href="/api/documents/export" className={buttonSecondaryClass}>
+            Export CSV
+          </a>
+          {org?.tax_regime === "split_rate" && org?.tax_id && <Gstr1ExportButton />}
           <Link href="/documents/new/bill" className={buttonSecondaryClass}>
             Record a bill
           </Link>
@@ -69,71 +67,18 @@ export default async function DocumentsPage() {
         </div>
       </header>
 
-      <div className="overflow-x-auto rounded-[10px] border border-line bg-white">
-        <table className="w-full text-left text-[13.5px]">
-          <thead>
-            <tr className="border-b border-line-soft text-[12px] uppercase tracking-wide text-ink-3">
-              <th className="px-5 py-3 font-medium">Number</th>
-              <th className="px-5 py-3 font-medium">Date</th>
-              <th className="px-5 py-3 font-medium">Party</th>
-              <th className="px-5 py-3 font-medium">Total</th>
-              <th className="px-5 py-3 font-medium">Due</th>
-              <th className="px-5 py-3 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-ink-3">
-                  Nothing issued yet. Record some work first, then bill it.
-                </td>
-              </tr>
-            )}
-            {rows.map((d) => {
-              const party = (d as unknown as { parties: { name: string } | null }).parties;
-              const state = settlementLabel(d.balance, d.status);
-              const overdue =
-                d.balance !== null &&
-                d.balance.balance_due_minor > 0 &&
-                d.due_date !== null &&
-                d.due_date < today;
-              const tone = overdue ? "overdue" : state.tone;
-
-              return (
-                <tr key={d.id} className="border-b border-line-soft last:border-b-0 hover:bg-paper">
-                  <td className="px-5 py-3">
-                    <Link href={`/documents/${d.id}`} className="font-mono font-medium text-brand hover:underline">
-                      {d.doc_no ?? d.party_doc_no ?? "—"}
-                    </Link>
-                    <span className="ml-2 text-[12px] text-ink-3">{KIND_LABEL[d.doc_kind] ?? d.doc_kind}</span>
-                  </td>
-                  <td className="px-5 py-3 font-mono text-ink-2">{d.doc_date}</td>
-                  <td className="px-5 py-3 font-medium text-ink">{party?.name ?? "—"}</td>
-                  <td className="px-5 py-3 font-mono text-ink">
-                    {formatMoney(d.total_minor, d.currency, locale)}
-                  </td>
-                  <td className="px-5 py-3 font-mono">
-                    {d.balance === null ? (
-                      <span className="text-ink-3">—</span>
-                    ) : d.balance.balance_due_minor <= 0 ? (
-                      <span className="text-ink-3">—</span>
-                    ) : (
-                      <span className={overdue ? "text-overdue" : "text-ink"}>
-                        {formatMoney(d.balance.balance_due_minor, d.currency, locale)}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-medium ${TONE[tone]}`}>
-                      {overdue ? "Overdue" : state.label}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <DocumentsTable
+        rows={rows.map((d) => ({
+          ...d,
+          party_name: (d as unknown as { parties: { name: string } | null }).parties?.name ?? null,
+        })) as DocumentRow[]}
+        locale={locale}
+        today={today}
+        hrefPrefix="/documents"
+        kindLabel={KIND_LABEL}
+        emptyLabel="Nothing issued yet. Record some work first, then bill it."
+        pdfHrefPrefix="/api/documents"
+      />
     </div>
   );
 }

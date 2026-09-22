@@ -141,6 +141,22 @@ export function formatMoney(
 }
 
 /**
+ * A free-form document line's amount, derived from its rate and quantity
+ * rather than trusted as a bare client-supplied figure. Without this, a
+ * caller could submit a line whose displayed rate × qty implies one amount
+ * but whose amount_minor is something else entirely — and amount_minor is
+ * exactly what feeds tax computation.
+ */
+export function lineAmountMinor(rateMinor: number, quantity: number, discountMinor = 0): number {
+  assertMinor(rateMinor);
+  assertMinor(discountMinor);
+  if (!Number.isFinite(quantity) || quantity < 0) {
+    throw new Error(`lineAmountMinor: expected a non-negative finite quantity, got ${quantity}`);
+  }
+  return Math.round(rateMinor * quantity) - discountMinor;
+}
+
+/**
  * Split an amount into `parts` pieces that sum back to exactly the original.
  * Used by the split_rate tax regime: half of 1,801 minor units is not a whole
  * number, and rounding each half independently would lose or gain a unit.

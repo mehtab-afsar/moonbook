@@ -6,6 +6,7 @@ import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
 import { computeAmount, PricingError } from "@/lib/pricing";
 import { formatMoney, fromMinor, toMinor } from "@/lib/money";
 import type { ActivityField } from "@/lib/activities/details-schema";
+import { filterPartiesForKind, type PartyRole } from "@/lib/parties/roles";
 
 /**
  * The form that makes one codebase serve many industries: it has no fields of
@@ -25,6 +26,7 @@ export interface EditableActivity {
   reference: string | null;
   amount_minor: number;
   direct_cost_minor: number | null;
+  tax_rate_pct: number | null;
   status: "pending" | "completed" | "cancelled";
   details: Record<string, unknown>;
 }
@@ -56,7 +58,7 @@ export function ActivityForm({
   onDone,
 }: {
   types: ActivityTypeOption[];
-  parties: { id: string; name: string }[];
+  parties: { id: string; name: string; role?: PartyRole; kind?: "client" | "vendor" | null }[];
   currency: string;
   locale: string;
   /** Present when correcting an existing activity rather than recording one. */
@@ -80,11 +82,21 @@ export function ActivityForm({
   const [directCost, setDirectCost] = useState(
     editing?.direct_cost_minor ? String(fromMinor(editing.direct_cost_minor, currency)) : "",
   );
+  const [taxRatePct, setTaxRatePct] = useState(
+    editing?.tax_rate_pct !== null && editing?.tax_rate_pct !== undefined ? String(editing.tax_rate_pct) : "",
+  );
   const [details, setDetails] = useState<Record<string, unknown>>(editing?.details ?? {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const type = types.find((t) => t.id === typeId);
+  // Which side the party picker offers follows the activity type's own
+  // direction — a receivable type bills a client, a payable one owes a
+  // vendor, and the two lists are never mixed into one.
+  const eligibleParties = useMemo(
+    () => filterPartiesForKind(parties, type?.direction === "payable" ? "vendor" : "client"),
+    [parties, type?.direction],
+  );
   const fields = useMemo(
     () => (type?.activity_fields ?? []).filter((f) => !f.archived_at).sort(sortByOrder),
     [type],
@@ -149,6 +161,7 @@ export function ActivityForm({
           details,
           amount_minor: manualAmount ? toMinor(Number(manualAmount), currency) : undefined,
           direct_cost_minor: showCost ? directCostMinor : null,
+          tax_rate_pct: taxRatePct.trim() ? Number(taxRatePct) : null,
           ...(editing ? { status: editing.status } : {}),
         }),
       },
@@ -165,6 +178,7 @@ export function ActivityForm({
       setReference("");
       setManualAmount("");
       setDirectCost("");
+      setTaxRatePct("");
       setBillToPartyId("");
     }
     onDone?.();
@@ -205,9 +219,7 @@ export function ActivityForm({
         <Labelled label="Party" htmlFor="party">
           <select id="party" required value={partyId} onChange={(e) => setPartyId(e.target.value)} className={inputClass}>
             <option value="">Select…</option>
-            {parties.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {eligibleParties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Labelled>
 
@@ -222,11 +234,7 @@ export function ActivityForm({
             className={inputClass}
           >
             <option value="">Same as party</option>
-            {parties
-              .filter((p) => p.id !== partyId)
-              .map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+            {eligibleParties.filter((p) => p.id !== partyId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Labelled>
 
@@ -279,6 +287,15 @@ export function ActivityForm({
             />
           </Labelled>
         )}
+
+        <Labelled label="Tax rate override (%, optional)" htmlFor="taxRate">
+          <input
+            id="taxRate" type="number" step="any" min="0" max="100" value={taxRatePct}
+            onChange={(e) => setTaxRatePct(e.target.value)}
+            className={`${inputClass} font-mono`}
+            placeholder="Uses your default rate if blank"
+          />
+        </Labelled>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">

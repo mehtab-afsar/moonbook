@@ -51,6 +51,13 @@ const ALLOWED = [
   "20260923000002_logistics_vertical_migrate_freight_orgs.sql",
   // Same one-time migration, onto the plastics fork.
   "20260924000002_plastics_vertical_migrate_scrap_orgs.sql",
+  // record_activity, update_activity and issue_document again, redefined to
+  // add a per-line tax rate override. Carries each function's existing
+  // `details` handling forward unchanged — nothing financial newly reads it.
+  "20261001000005_per_line_tax_rate.sql",
+  // issue_document again, redefined to persist each tax component's taxable
+  // base. Carries the same `details` handling forward unchanged.
+  "20261001000006_tax_component_base.sql",
 ];
 
 /** Every `create [or replace] view ... as <body>;` in the migrations. */

@@ -5,7 +5,16 @@ import { useRouter } from "next/navigation";
 import { Paperclip, Loader2 } from "lucide-react";
 
 /** Upload or open the one proof-of-delivery file an activity can carry. */
-export function AttachmentButton({ activityId, hasAttachment }: { activityId: string; hasAttachment: boolean }) {
+export function AttachmentButton({
+  activityId,
+  hasAttachment,
+  apiBase = "/api/activities",
+}: {
+  activityId: string;
+  hasAttachment: boolean;
+  /** Which vertical's attachment route to hit — shared by default. */
+  apiBase?: string;
+}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -16,7 +25,7 @@ export function AttachmentButton({ activityId, hasAttachment }: { activityId: st
     setError("");
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`/api/activities/${activityId}/attachment`, { method: "POST", body: form });
+    const res = await fetch(`${apiBase}/${activityId}/attachment`, { method: "POST", body: form });
     setBusy(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
@@ -29,7 +38,7 @@ export function AttachmentButton({ activityId, hasAttachment }: { activityId: st
   async function open() {
     setBusy(true);
     setError("");
-    const res = await fetch(`/api/activities/${activityId}/attachment`);
+    const res = await fetch(`${apiBase}/${activityId}/attachment`);
     setBusy(false);
     if (!res.ok) {
       setError("Could not open that file.");

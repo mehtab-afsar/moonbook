@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/money";
 import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
+import { filterPartiesForKind, type PartyRole } from "@/lib/parties/roles";
 
 /**
  * Bill work that has already been recorded.
@@ -32,6 +33,8 @@ export interface PartyOption {
   id: string;
   name: string;
   payment_terms_days: number;
+  role?: PartyRole;
+  kind?: "client" | "vendor" | null;
 }
 
 const COPY = {
@@ -87,6 +90,10 @@ export function IssueForm({
 
   const party = parties.find((p) => p.id === partyId);
   const available = activitiesByParty[partyId] ?? [];
+  const eligibleParties = useMemo(
+    () => filterPartiesForKind(parties, docKind === "bill" ? "vendor" : "client"),
+    [parties, docKind],
+  );
 
   const dueDate = useMemo(() => {
     if (!party) return "";
@@ -163,7 +170,7 @@ export function IssueForm({
         </label>
         <select id="party" required value={partyId} onChange={(e) => pickParty(e.target.value)} className={inputClass}>
           <option value="">{copy.whoPlaceholder}</option>
-          {parties.map((p) => {
+          {eligibleParties.map((p) => {
             const count = activitiesByParty[p.id]?.length ?? 0;
             return (
               <option key={p.id} value={p.id}>

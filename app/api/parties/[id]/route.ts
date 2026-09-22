@@ -9,7 +9,7 @@ import { rpcError } from "@/lib/api/errors";
 export const runtime = "nodejs";
 
 const COLUMNS =
-  "id, name, country_code, region_code, tax_id, tax_id_kind, payment_terms_days, credit_limit_minor, email, phone, address, notes, created_at";
+  "id, name, kind, country_code, region_code, tax_id, tax_id_kind, payment_terms_days, credit_limit_minor, email, phone, address, notes, payout_bank_name, payout_account_no, payout_ifsc_or_routing, payout_upi_id, created_at";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await verifyAuth();
@@ -29,6 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 /** Every field optional: a PATCH changes what it names and nothing else. */
 const patchSchema = z.object({
   name: z.string().trim().min(2).max(200).optional(),
+  kind: z.enum(["client", "vendor"]).optional().nullable(),
   country_code: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).optional().nullable(),
   region_code: z.string().trim().toUpperCase().max(10).optional().nullable(),
   tax_id: z.string().trim().max(40).optional().nullable(),
@@ -39,6 +40,10 @@ const patchSchema = z.object({
   phone: z.string().trim().max(40).optional().nullable(),
   address: z.string().trim().max(500).optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
+  payout_bank_name: z.string().trim().max(200).optional().nullable(),
+  payout_account_no: z.string().trim().max(64).optional().nullable(),
+  payout_ifsc_or_routing: z.string().trim().max(32).optional().nullable(),
+  payout_upi_id: z.string().trim().max(100).optional().nullable(),
 });
 
 /**

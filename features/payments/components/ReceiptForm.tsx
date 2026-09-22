@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney, fromMinor, toMinor, type CurrencyCode } from "@/lib/money";
 import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
+import { filterPartiesForKind, type PartyRole } from "@/lib/parties/roles";
 
 /**
  * Take money in, and decide what it settles.
@@ -30,7 +31,6 @@ const COPY = {
   in: {
     who: "Who paid?",
     whoPlaceholder: "Choose a party…",
-    openSuffix: (n: number) => ` — ${n} open`,
     amount: "Amount received",
     when: "Received on",
     empty: "Nothing outstanding for this party. Anything recorded now is held as credit against their next invoice.",
@@ -44,7 +44,6 @@ const COPY = {
   out: {
     who: "Who did we pay?",
     whoPlaceholder: "Choose a vendor…",
-    openSuffix: (n: number) => ` — ${n} open`,
     amount: "Amount paid",
     when: "Paid on",
     empty: "Nothing outstanding to this vendor. Anything recorded now is held as an advance against their next bill.",
@@ -64,8 +63,9 @@ export function ReceiptForm({
   today,
   direction = "in",
   defaultCurrency,
+  onDone,
 }: {
-  parties: { id: string; name: string }[];
+  parties: { id: string; name: string; role?: PartyRole; kind?: "client" | "vendor" | null }[];
   openByParty: Record<string, OpenDocument[]>;
   locale: string;
   today: string;
@@ -78,6 +78,7 @@ export function ReceiptForm({
    * silently computing to a zero amount.
    */
   defaultCurrency: string;
+  onDone?: () => void;
 }) {
   const copy = COPY[direction];
   // Two ReceiptForm instances (in and out) can render on the same page — a
@@ -99,6 +100,12 @@ export function ReceiptForm({
   // `?? []` builds a fresh array each render, which would change the identity
   // of a useMemo dependency every time.
   const open = useMemo(() => openByParty[partyId] ?? [], [openByParty, partyId]);
+  // "in" (a receipt) is money from a client; "out" (a vendor payment) is
+  // money to a vendor — never offer the other side in this dropdown.
+  const eligibleParties = useMemo(
+    () => filterPartiesForKind(parties, direction === "out" ? "vendor" : "client"),
+    [parties, direction],
+  );
   const currency = (open[0]?.currency ?? defaultCurrency) as CurrencyCode;
 
   const amountMinor = useMemo(() => {
@@ -176,6 +183,7 @@ export function ReceiptForm({
 
     setSaving(false);
     setAmount(""); setReference(""); setOverrides({}); setPartyId("");
+    onDone?.();
     router.refresh();
   }
 
@@ -192,11 +200,13 @@ export function ReceiptForm({
             className={inputClass}
           >
             <option value="">{copy.whoPlaceholder}</option>
-            {parties.map((p) => {
-              const n = openByParty[p.id]?.length ?? 0;
+            {eligibleParties.map((p) => {
+              const docs = openByParty[p.id] ?? [];
+              const outstanding = docs.reduce((s, d) => s + d.balance_due_minor, 0);
               return (
                 <option key={p.id} value={p.id}>
-                  {p.name}{n > 0 ? copy.openSuffix(n) : ""}
+                  {p.name}
+                  {outstanding > 0 ? ` (${formatMoney(outstanding, docs[0].currency, locale)} due)` : ""}
                 </option>
               );
             })}
@@ -247,7 +257,7 @@ export function ReceiptForm({
         </div>
       </div>
 
-      {partyId !== "" && open.length > 0 && amountMinor > 0 && (
+      {partyId !== "" && open.length > 0 && (
         <div className="space-y-2">
           <span className="block text-[13px] font-medium text-ink">What does this settle?</span>
           <div className="divide-y divide-line-soft rounded-md border border-line">

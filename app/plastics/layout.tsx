@@ -18,9 +18,9 @@ export default async function PlasticsLayout({ children }: { children: React.Rea
     .single();
 
   return (
-    <div className="flex min-h-dvh bg-paper">
+    <div className="flex h-dvh bg-paper">
       <PlasticsSidebar orgName={org?.legal_name ?? "Moonbook"} userName={auth.ctx.fullName ?? auth.ctx.role} />
-      <main className="min-w-0 flex-1">{children}</main>
+      <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
     </div>
   );
 }

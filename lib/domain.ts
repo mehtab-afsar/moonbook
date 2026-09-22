@@ -102,6 +102,37 @@ export const PLASTICS_GRADES = ["A", "B", "C", "Mixed"] as const;
 export type PlasticsGrade = (typeof PLASTICS_GRADES)[number];
 
 /**
+ * organisations.invoice_template — mirrored in lib/pdf/templates/meta.ts's
+ * INVOICE_TEMPLATES, which carries the label/description for each; that file
+ * cannot import this one back (it's pulled into the PDF renderer, and this
+ * file is the SQL-parity source of truth other RPCs' zod schemas lean on),
+ * so the two lists are kept in sync by hand and by this file's own test.
+ */
+export const INVOICE_TEMPLATE_KEYS = ["classic", "modern"] as const;
+export type InvoiceTemplateKey = (typeof INVOICE_TEMPLATE_KEYS)[number];
+
+/** documents.einvoice_status — see 20261001000007_document_compliance_refs.sql. */
+export const EINVOICE_STATUSES = ["not_applicable", "pending", "generated", "cancelled"] as const;
+export type EinvoiceStatus = (typeof EINVOICE_STATUSES)[number];
+
+/** gstn_connections.provider — see 20261001000008_gstn_connections.sql. */
+export const GSTN_PROVIDERS = ["cleartax", "cygnet", "mastergst", "iris", "other"] as const;
+export type GstnProvider = (typeof GSTN_PROVIDERS)[number];
+
+export const GSTN_ENVIRONMENTS = ["sandbox", "production"] as const;
+export type GstnEnvironment = (typeof GSTN_ENVIRONMENTS)[number];
+
+export const GSTN_CONNECTION_STATUSES = ["not_connected", "pending", "connected", "error"] as const;
+export type GstnConnectionStatus = (typeof GSTN_CONNECTION_STATUSES)[number];
+
+/**
+ * activity_link_types.aggregate — a CLOSED set of rollup kinds, not a
+ * formula language. See 20261001000010_activity_link_types.sql.
+ */
+export const LINK_AGGREGATES = ["none", "sum_amount", "count"] as const;
+export type LinkAggregate = (typeof LINK_AGGREGATES)[number];
+
+/**
  * Each list paired with the SQL constraint it must equal.
  *
  * EDITABLE_ACTIVITY_STATUSES is deliberately absent: it is a strict subset of
@@ -125,6 +156,7 @@ export const SQL_PARITY: Readonly<Record<string, readonly string[]>> = {
   payments_direction_chk: PAYMENT_DIRECTIONS,
   payments_method_chk: PAYMENT_METHODS,
   profiles_role_chk: ROLES,
+  org_invites_role_chk: ROLES,
   organisations_vertical_chk: VERTICALS,
   logistics_activities_direction_chk: DIRECTIONS,
   logistics_activities_status_chk: ACTIVITY_STATUSES,
@@ -132,4 +164,10 @@ export const SQL_PARITY: Readonly<Record<string, readonly string[]>> = {
   plastics_activities_direction_chk: DIRECTIONS,
   plastics_activities_status_chk: ACTIVITY_STATUSES,
   plastics_document_series_kind_chk: BILLABLE_DOC_KINDS,
+  organisations_invoice_template_chk: INVOICE_TEMPLATE_KEYS,
+  documents_einvoice_status_chk: EINVOICE_STATUSES,
+  gstn_connections_provider_chk: GSTN_PROVIDERS,
+  gstn_connections_environment_chk: GSTN_ENVIRONMENTS,
+  gstn_connections_status_chk: GSTN_CONNECTION_STATUSES,
+  activity_link_types_aggregate_chk: LINK_AGGREGATES,
 };

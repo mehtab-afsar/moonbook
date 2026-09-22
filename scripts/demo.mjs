@@ -1,10 +1,18 @@
 /**
  * Four businesses, ready to look at. No sign-up, no inbox.
  *
- * Creates one organisation per industry with real data in it, and prints a
- * sign-in link for each that works immediately — the magic link is minted
- * directly rather than emailed, so there is no Mailpit to open and no flow to
- * sit through before reaching the thing worth judging.
+ * Creates one organisation per industry with real data in it, and prints
+ * email+password credentials for each that sign in immediately at /login —
+ * auth is email+password (see EmailSignIn.tsx), not a magic link, so there
+ * is no Mailpit to open and no flow to sit through before reaching the thing
+ * worth judging. (An earlier version of this script minted a magic link
+ * instead; that stopped working when auth moved to email+password and
+ * app/auth/callback/route.ts, the magic link's landing route, was removed.)
+ *
+ * Freight and scrap are forked verticals (see docs/ONTOLOGY.md) — after
+ * their industry template is copied in, activate_vertical() moves them onto
+ * logistics_ or plastics_ tables the same way a real signup does, so their demo org
+ * actually lands on /logistics or /plastics rather than the shared engine.
  *
  * The point of running all four is that they are the SAME software. Open them
  * side by side: the activity form, the invoice, the PDF and the dashboard are
@@ -28,15 +36,13 @@ const RUN = Date.now().toString(36);
 
 async function signIn(local) {
   const email = `${local}+${RUN}@moonbook.test`;
-  const { error } = await admin.auth.admin.createUser({ email, email_confirm: true });
+  const password = `demo-${RUN}-pass`;
+  const { error } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
   if (error) throw new Error(`${email}: ${error.message}`);
-  const { data: link } = await admin.auth.admin.generateLink({ type: "magiclink", email });
 
   const client = createClient(URL_, ANON, { auth: { persistSession: false } });
-  const { data, error: otpErr } = await client.auth.verifyOtp({
-    token_hash: link.properties.hashed_token, type: "email",
-  });
-  if (otpErr) throw otpErr;
+  const { data, error: pwErr } = await client.auth.signInWithPassword({ email, password });
+  if (pwErr) throw pwErr;
   await client.auth.setSession(data.session);
 
   // Wait out the sub-second clock race between GoTrue's `iat` and PostgREST.
@@ -47,9 +53,7 @@ async function signIn(local) {
     await new Promise((r) => setTimeout(r, 100));
   }
 
-  // A SECOND link, unredeemed, for a person to click.
-  const { data: fresh } = await admin.auth.admin.generateLink({ type: "magiclink", email });
-  return { email, client, loginUrl: fresh.properties.action_link };
+  return { email, password, client };
 }
 
 const COUNTRY = {
@@ -57,9 +61,13 @@ const COUNTRY = {
   GB: { currency: "GBP", locale: "en-GB", tz: "Europe/London", fy: 1, regime: "single_rate", rate: 20, kind: "VAT" },
 };
 
+// Mirrors TEMPLATE_VERTICAL in app/api/organisations/route.ts — the two
+// templates that fork the org off the shared ledger at signup.
+const TEMPLATE_VERTICAL = { freight: "logistics", scrap: "plastics" };
+
 async function business({ local, name, template, country = "IN", region = "KA" }) {
   const c = COUNTRY[country];
-  const { email, client, loginUrl } = await signIn(local);
+  const { email, password, client } = await signIn(local);
 
   const { data: org, error } = await client.rpc("create_organisation", {
     p_legal_name: name, p_country_code: country, p_base_currency: c.currency,
@@ -74,7 +82,15 @@ async function business({ local, name, template, country = "IN", region = "KA" }
   const { error: tErr } = await client.rpc("apply_industry_template", { p_template_key: template });
   if (tErr) throw new Error(`${name} template: ${tErr.message}`);
 
-  return { email, client, loginUrl, orgId: org.org_id, name };
+  const vertical = TEMPLATE_VERTICAL[template];
+  let dashboardPath = "/dashboard";
+  if (vertical) {
+    const { error: vErr } = await client.rpc("activate_vertical", { p_vertical: vertical });
+    if (vErr) throw new Error(`${name} activate_vertical: ${vErr.message}`);
+    dashboardPath = `/${vertical}/dashboard`;
+  }
+
+  return { email, password, client, orgId: org.org_id, name, dashboardPath };
 }
 
 const party = async (b, name, region = "KA", terms = 30) => {
@@ -108,34 +124,34 @@ const money = (major) => Math.round(major * 100);
 async function main() {
   const out = [];
 
-  // ── Logistics ────────────────────────────────────────────────────────────
+  // ── Logistics — a forked vertical, its own table and RPC, not
+  // activity_types/record_activity (see docs/ONTOLOGY.md). ─────────────────
   const freight = await business({
     local: "freight", name: "Sahyadri Roadlines", template: "freight",
   });
   const fCust = await party(freight, "Konkan Ceramics", "KA", 15);
   const fBroker = await party(freight, "Deccan Freight Brokers", "MH", 30);
-  const trip = await typeId(freight, "trip");
   for (const [o, d, v, amt, date] of [
     ["Pune", "Nashik", "MH12AB1122", 38000, "2026-06-04"],
     ["Pune", "Aurangabad", "MH12CD3344", 30000, "2026-06-07"],
     ["Pune", "Kolhapur", "MH12EF5566", 24500, "2026-06-11"],
   ]) {
-    await record(freight, {
-      typeId: trip, partyId: fCust, occurredOn: date, amountMinor: money(amt),
-      details: { origin: o, destination: d, vehicle_no: v, load_type: "Full truckload" },
-    });
+    const { error } = await freight.client.rpc("record_logistics_activity", {
+      p_direction: "receivable", p_party_id: fCust, p_occurred_on: date,
+      p_amount_minor: money(amt), p_origin: o, p_destination: d,
+      p_vehicle_no: v, p_load_type: "Full truckload",
+    }).single();
+    if (error) throw new Error(`${freight.name} / record: ${error.message}`);
   }
   out.push({ ...freight, note: `2 customers, 3 trips` });
   void fBroker;
 
-  // ── Scrap ────────────────────────────────────────────────────────────────
+  // ── Scrap — same forking as freight, onto plastics_*. ───────────────────
   const scrap = await business({
     local: "scrap", name: "Nandi Recyclers", template: "scrap",
   });
   const collector = await party(scrap, "Ward 12 Collection Co-op", "KA", 7);
   const processor = await party(scrap, "Mysuru Polymers", "KA", 30);
-  const matIn = await typeId(scrap, "material_in");
-  const matOut = await typeId(scrap, "material_out");
 
   // Bought by weight — the amount is the product of two recorded fields.
   for (const [mat, kg, rate, slip] of [
@@ -143,18 +159,20 @@ async function main() {
     ["HDPE", 960, 28, "WB-4418"],
     ["Cardboard", 3200, 9, "WB-4421"],
   ]) {
-    await record(scrap, {
-      typeId: matIn, partyId: collector, occurredOn: "2026-06-05",
-      amountMinor: money(kg * rate),
-      details: { material: mat, grade: "B", net_weight_kg: kg, rate_per_kg: rate, ticket_no: slip },
-    });
+    const { error } = await scrap.client.rpc("record_plastics_activity", {
+      p_direction: "payable", p_party_id: collector, p_occurred_on: "2026-06-05",
+      p_amount_minor: money(kg * rate), p_material: mat, p_net_weight_kg: kg,
+      p_rate_per_kg_minor: money(rate), p_grade: "B", p_ticket_no: slip,
+    }).single();
+    if (error) throw new Error(`${scrap.name} / record: ${error.message}`);
   }
   for (const [mat, kg, rate] of [["PET flake", 1600, 48], ["HDPE flake", 820, 55]]) {
-    await record(scrap, {
-      typeId: matOut, partyId: processor, occurredOn: "2026-06-12",
-      amountMinor: money(kg * rate),
-      details: { material: mat, grade: "A", net_weight_kg: kg, rate_per_kg: rate, vehicle_no: "KA09XY7788" },
-    });
+    const { error } = await scrap.client.rpc("record_plastics_activity", {
+      p_direction: "receivable", p_party_id: processor, p_occurred_on: "2026-06-12",
+      p_amount_minor: money(kg * rate), p_material: mat, p_net_weight_kg: kg,
+      p_rate_per_kg_minor: money(rate), p_grade: "A", p_vehicle_no: "KA09XY7788",
+    }).single();
+    if (error) throw new Error(`${scrap.name} / record: ${error.message}`);
   }
   out.push({ ...scrap, note: "buys AND sells — 3 purchases, 2 sales" });
 
@@ -201,10 +219,10 @@ async function main() {
   for (const b of out) {
     console.log(`  ${b.name}`);
     console.log(`    ${b.note}`);
-    console.log(`    ${b.loginUrl}\n`);
+    console.log(`    ${APP}/login  →  ${b.email} / ${b.password}`);
+    console.log(`    Lands on: ${APP}${b.dashboardPath}\n`);
   }
-  console.log(`  Each link signs you straight in — no inbox involved.`);
-  console.log(`  Then: ${APP}/activities to see what that business records.\n`);
+  console.log(`  Sign in with the email and password printed above — no inbox involved.\n`);
 }
 
 main().catch((e) => { console.error("\n ", e.message, "\n"); process.exit(1); });

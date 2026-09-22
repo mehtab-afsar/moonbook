@@ -27,6 +27,14 @@ export type TaxComponent = {
   component_label: string;
   rate_pct: number;
   amount_minor: number;
+  /**
+   * The taxable value this component was computed from. Both halves of a
+   * split-rate pair (CGST + SGST) carry the SAME value — it is the pair's
+   * shared base, not each component's own half — so a filing export can
+   * read it back exactly rather than dividing amount_minor by rate_pct,
+   * which is exact only before rounding ever touches either number.
+   */
+  taxable_value_minor: number;
   sort_order: number;
 };
 
@@ -112,6 +120,7 @@ function singleRate(input: TaxInput): TaxComponent[] {
       component_label: `VAT ${formatRate(input.ratePct)}%`,
       rate_pct: input.ratePct,
       amount_minor: amount,
+      taxable_value_minor: input.taxableValueMinor,
       sort_order: 0,
     },
   ];
@@ -145,6 +154,7 @@ function splitRate(input: TaxInput): TaxComponent[] {
         component_label: `${codes.combined} ${formatRate(input.ratePct)}%`,
         rate_pct: input.ratePct,
         amount_minor: total,
+        taxable_value_minor: input.taxableValueMinor,
         sort_order: 0,
       },
     ];
@@ -158,6 +168,7 @@ function splitRate(input: TaxInput): TaxComponent[] {
       component_label: `${codes.first} ${formatRate(half)}%`,
       rate_pct: half,
       amount_minor: first,
+      taxable_value_minor: input.taxableValueMinor,
       sort_order: 0,
     },
     {
@@ -165,9 +176,59 @@ function splitRate(input: TaxInput): TaxComponent[] {
       component_label: `${codes.second} ${formatRate(half)}%`,
       rate_pct: half,
       amount_minor: second,
+      taxable_value_minor: input.taxableValueMinor,
       sort_order: 1,
     },
   ];
+}
+
+/**
+ * Several taxable-value groups, each at its own rate, computed and merged
+ * into one breakdown — the wholesale case: 5% oil and 18% groceries on one
+ * delivery, where `computeTax` alone only ever knew one rate per document.
+ *
+ * Grouping by rate happens HERE, not at each call site, so "what happens
+ * when two lines share a rate" (their values are summed into one group, one
+ * CGST/SGST pair — not two identical pairs) is answered once.
+ *
+ * treatment/regime still apply document-wide, exactly as before: an exempt
+ * or reverse-charge document is exempt at every rate, and `computeTax` zeroes
+ * each group out identically, so no special-casing is needed for those.
+ */
+export function computeTaxGrouped(
+  groups: { taxableValueMinor: number; ratePct: number }[],
+  shared: Omit<TaxInput, "taxableValueMinor" | "ratePct">,
+): TaxResult {
+  const byRate = new Map<number, number>();
+  for (const g of groups) {
+    if (g.taxableValueMinor === 0) continue;
+    byRate.set(g.ratePct, (byRate.get(g.ratePct) ?? 0) + g.taxableValueMinor);
+  }
+
+  if (byRate.size === 0) {
+    return computeTax({ ...shared, taxableValueMinor: 0, ratePct: 0 });
+  }
+
+  let totalTaxableMinor = 0;
+  let totalTaxMinor = 0;
+  const components: TaxComponent[] = [];
+  let note: string | null = null;
+  let sortCursor = 0;
+
+  // Sorted so the breakdown prints lowest rate first — a fact about the
+  // document's presentation, not about the domain, but a stable one.
+  for (const ratePct of [...byRate.keys()].sort((a, b) => a - b)) {
+    const taxableValueMinor = byRate.get(ratePct)!;
+    totalTaxableMinor += taxableValueMinor;
+    const result = computeTax({ ...shared, taxableValueMinor, ratePct });
+    totalTaxMinor += result.totalTaxMinor;
+    note = result.note;
+    for (const c of result.components) {
+      components.push({ ...c, sort_order: sortCursor++ });
+    }
+  }
+
+  return { components, totalTaxMinor, totalMinor: totalTaxableMinor + totalTaxMinor, note };
 }
 
 function normaliseRegion(region: string | null | undefined): string | null {

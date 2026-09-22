@@ -7,6 +7,9 @@ import { attachBalances, settlementLabel } from "@/lib/documents/with-balances";
 import { parseSnapshot } from "@/lib/pdf/snapshot";
 import { RecordPaymentForm } from "@/features/documents/components/RecordPaymentForm";
 import { DocumentActions, type HeldCredit } from "@/features/documents/components/DocumentActions";
+import { PartyCard } from "@/features/documents/components/PartyCard";
+import { DocumentSummaryCards } from "@/features/documents/components/DocumentSummaryCards";
+import { ComplianceRefsForm, type ComplianceRefs } from "@/features/documents/components/ComplianceRefsForm";
 import { buttonSecondaryClass } from "@/lib/ui/styles";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +39,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
 
   const { data: doc, error } = await supabase
     .from("documents")
-    .select("id, doc_kind, doc_no, party_doc_no, doc_date, due_date, status, currency, direction, counterparty_id, issued_snapshot")
+    .select("id, doc_kind, doc_no, party_doc_no, doc_date, due_date, status, currency, direction, counterparty_id, issued_snapshot, ewb_no, ewb_valid_until, irn, irn_ack_no, irn_ack_date, qr_code_data, einvoice_status")
     .eq("id", id)
     .maybeSingle();
 
@@ -51,7 +54,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
       attachBalances(supabase, [doc]),
       supabase
         .from("allocations")
-        .select("id, amount_minor, created_at, payments!allocations_payment_id_fkey(paid_on, method, reference_no)")
+        .select("id, payment_id, amount_minor, created_at, payments!allocations_payment_id_fkey(paid_on, method, reference_no)")
         .eq("target_document_id", id)
         .order("created_at"),
       // Money in the book with somewhere left to go. Both are views, so both
@@ -114,7 +117,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   ];
 
   return (
-    <div className="max-w-[900px] space-y-6 p-8">
+    <div className="mx-auto max-w-[1200px] space-y-6 p-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Link href="/documents" className="text-[13px] text-ink-2 hover:text-ink">
@@ -146,6 +149,25 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
         </p>
       ) : (
         <>
+          <div className={`grid gap-4 ${snapshot.ship_to ? "min-[640px]:grid-cols-2" : ""}`}>
+            <PartyCard
+              label={doc.direction === "receivable" ? "Bill to" : "Bill from"}
+              name={snapshot.counterparty.name}
+              taxId={snapshot.counterparty.tax_id}
+              taxIdKind={snapshot.counterparty.tax_id_kind}
+              regionCode={snapshot.counterparty.region_code}
+            />
+            {snapshot.ship_to && (
+              <PartyCard
+                label="Ship to"
+                name={snapshot.ship_to.name}
+                taxId={snapshot.ship_to.tax_id}
+                taxIdKind={snapshot.ship_to.tax_id_kind}
+                regionCode={snapshot.ship_to.region_code}
+              />
+            )}
+          </div>
+
           <div className="overflow-x-auto rounded-[10px] border border-line bg-white">
             <table className="w-full text-left text-[13.5px]">
               <thead>
@@ -172,36 +194,34 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
                 ))}
               </tbody>
             </table>
-
-            <div className="border-t border-line px-5 py-4">
-              <dl className="ml-auto max-w-[280px] space-y-1.5 text-[13.5px]">
-                <div className="flex justify-between">
-                  <dt className="text-ink-2">Taxable value</dt>
-                  <dd className="font-mono text-ink">{money(snapshot.document.taxable_value_minor)}</dd>
-                </div>
-                {/* However many components the regime produced — two, one, or
-                    none at all. Nothing here knows which country this is. */}
-                {snapshot.taxes.map((t, i) => (
-                  <div key={i} className="flex justify-between">
-                    <dt className="text-ink-2">{t.component_label}</dt>
-                    <dd className="font-mono text-ink">{money(t.amount_minor)}</dd>
-                  </div>
-                ))}
-                <div className="flex justify-between border-t border-line pt-1.5">
-                  <dt className="font-medium text-ink">Total</dt>
-                  <dd className="font-mono font-semibold text-ink">{money(snapshot.document.total_minor)}</dd>
-                </div>
-                {balance && balance.balance_due_minor !== snapshot.document.total_minor && (
-                  <div className="flex justify-between">
-                    <dt className="text-ink-2">Outstanding</dt>
-                    <dd className={`font-mono ${overdue ? "text-overdue" : "text-ink"}`}>
-                      {money(balance.balance_due_minor)}
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </div>
           </div>
+
+          <DocumentSummaryCards
+            taxableValueMinor={snapshot.document.taxable_value_minor}
+            taxes={snapshot.taxes.map((t) => ({ label: t.component_label, amount_minor: t.amount_minor }))}
+            totalMinor={snapshot.document.total_minor}
+            paidMinor={balance ? snapshot.document.total_minor - balance.balance_due_minor : 0}
+            balanceDueMinor={balance?.balance_due_minor ?? null}
+            overdue={overdue}
+            currency={doc.currency}
+            locale={locale}
+          />
+
+          {(doc.doc_kind === "invoice" || doc.doc_kind === "bill") && (
+            <ComplianceRefsForm
+              documentId={doc.id}
+              refs={{
+                ewb_no: doc.ewb_no,
+                ewb_valid_until: doc.ewb_valid_until,
+                irn: doc.irn,
+                irn_ack_no: doc.irn_ack_no,
+                irn_ack_date: doc.irn_ack_date,
+                qr_code_data: doc.qr_code_data,
+                einvoice_status: doc.einvoice_status as ComplianceRefs["einvoice_status"],
+              }}
+              isOwner={auth.ctx.role === "owner"}
+            />
+          )}
 
           {snapshot.document.tax_treatment !== "forward" && (
             <p className="rounded-[10px] border border-line bg-paper p-4 text-[13px] text-ink-2">
@@ -221,12 +241,22 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
               <ul className="divide-y divide-line-soft rounded-[10px] border border-line bg-white">
                 {(allocations ?? []).map((a) => {
                   const p = (a as unknown as {
+                    payment_id: string | null;
                     payments: { paid_on: string; method: string; reference_no: string | null } | null;
                   }).payments;
+                  const paymentId = (a as unknown as { payment_id: string | null }).payment_id;
                   return (
                     <li key={a.id} className="flex items-baseline justify-between p-3.5 text-[13.5px]">
                       <span className="text-ink-2">
-                        {p ? `${p.paid_on} · ${p.method}` : "Credit note applied"}
+                        {p && paymentId ? (
+                          <Link href={`/payments/${paymentId}`} className="text-brand hover:underline">
+                            {p.paid_on} · {p.method}
+                          </Link>
+                        ) : p ? (
+                          `${p.paid_on} · ${p.method}`
+                        ) : (
+                          "Credit note applied"
+                        )}
                         {p?.reference_no && <span className="ml-2 font-mono text-ink-3">{p.reference_no}</span>}
                       </span>
                       <span className="font-mono text-ink">{money(a.amount_minor)}</span>

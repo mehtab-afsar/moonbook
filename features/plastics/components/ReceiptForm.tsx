@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney, fromMinor, toMinor, type CurrencyCode } from "@/lib/money";
 import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
+import { filterPartiesForKind, type PartyRole } from "@/lib/parties/roles";
 
 export interface OpenDocument {
   id: string; doc_no: string; doc_date: string; due_date: string | null; currency: string; balance_due_minor: number;
@@ -15,10 +16,12 @@ const COPY = {
 } as const;
 
 export function ReceiptForm({
-  parties, openByParty, locale, today, direction = "in", defaultCurrency,
+  parties, openByParty, locale, today, direction = "in", defaultCurrency, onDone,
 }: {
-  parties: { id: string; name: string }[]; openByParty: Record<string, OpenDocument[]>;
+  parties: { id: string; name: string; role?: PartyRole; kind?: "client" | "vendor" | null }[];
+  openByParty: Record<string, OpenDocument[]>;
   locale: string; today: string; direction?: "in" | "out"; defaultCurrency: string;
+  onDone?: () => void;
 }) {
   const copy = COPY[direction];
   const id = (base: string) => `pr${direction}-${base}`;
@@ -32,6 +35,10 @@ export function ReceiptForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const eligibleParties = useMemo(
+    () => filterPartiesForKind(parties, direction === "out" ? "vendor" : "client"),
+    [parties, direction],
+  );
   const open = useMemo(() => openByParty[partyId] ?? [], [openByParty, partyId]);
   const currency = (open[0]?.currency ?? defaultCurrency) as CurrencyCode;
   const amountMinor = useMemo(() => {
@@ -74,6 +81,7 @@ export function ReceiptForm({
     const body = await res.json();
     if (!res.ok) { setSaving(false); setError(body.error ?? "Something went wrong."); return; }
     setSaving(false); setAmount(""); setReference(""); setOverrides({}); setPartyId("");
+    onDone?.();
     router.refresh();
   }
 
@@ -84,9 +92,14 @@ export function ReceiptForm({
           <label htmlFor={id("party")} className="mb-1.5 block text-[13px] font-medium text-ink">{copy.who}</label>
           <select id={id("party")} required value={partyId} onChange={(e) => { setPartyId(e.target.value); setOverrides({}); }} className={inputClass}>
             <option value="">Choose a party…</option>
-            {parties.map((p) => {
-              const n = openByParty[p.id]?.length ?? 0;
-              return <option key={p.id} value={p.id}>{p.name}{n > 0 ? ` — ${n} open` : ""}</option>;
+            {eligibleParties.map((p) => {
+              const docs = openByParty[p.id] ?? [];
+              const outstanding = docs.reduce((s, d) => s + d.balance_due_minor, 0);
+              return (
+                <option key={p.id} value={p.id}>
+                  {p.name}{outstanding > 0 ? ` (${formatMoney(outstanding, docs[0].currency, locale)} due)` : ""}
+                </option>
+              );
             })}
           </select>
         </div>
@@ -111,7 +124,7 @@ export function ReceiptForm({
         </div>
       </div>
 
-      {partyId !== "" && open.length > 0 && amountMinor > 0 && (
+      {partyId !== "" && open.length > 0 && (
         <div className="space-y-2">
           <span className="block text-[13px] font-medium text-ink">What does this settle?</span>
           <div className="divide-y divide-line-soft rounded-md border border-line">

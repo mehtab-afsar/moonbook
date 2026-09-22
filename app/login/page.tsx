@@ -19,11 +19,12 @@ export default async function LoginPage() {
         <EmailSignIn
           next="/dashboard"
           heading="Sign in."
-          reason="Enter the email your account is registered with and we'll send you a link."
+          reason="Enter the email and password your account is registered with."
+          mode="signin"
         />
         <p className="mt-8 text-[13px] text-ink-3">
           New here?{" "}
-          <Link href="/start" className="font-medium text-brand hover:text-brand-hover">
+          <Link href="/start" className="font-medium text-ink hover:text-ink-2">
             Set up your business
           </Link>
         </p>

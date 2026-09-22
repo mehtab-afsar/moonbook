@@ -9,7 +9,7 @@ import { rpcError } from "@/lib/api/errors";
 export const runtime = "nodejs";
 
 const COLUMNS =
-  "id, party_id, bill_to_party_id, direction, occurred_on, currency, amount_minor, direct_cost_minor, origin, destination, vehicle_no, load_type, vendor_ref, reference, notes, status, attachment_path, created_at";
+  "id, party_id, bill_to_party_id, direction, occurred_on, currency, amount_minor, direct_cost_minor, origin, destination, vehicle_no, load_type, vendor_ref, reference, notes, status, attachment_path, assigned_vendor_id, distance_km, created_at";
 
 export async function GET() {
   const auth = await verifyAuth();
@@ -41,6 +41,8 @@ const recordSchema = z.object({
   vendor_ref: z.string().trim().max(100).optional().nullable(),
   reference: z.string().trim().max(100).optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
+  assigned_vendor_id: z.uuid().optional().nullable(),
+  distance_km: z.number().min(0).optional().nullable(),
 });
 
 export async function POST(req: NextRequest) {
@@ -68,6 +70,8 @@ export async function POST(req: NextRequest) {
       p_reference: v.reference ?? undefined,
       p_notes: v.notes ?? undefined,
       p_direct_cost_minor: v.direct_cost_minor ?? undefined,
+      p_assigned_vendor_id: v.assigned_vendor_id ?? undefined,
+      p_distance_km: v.distance_km ?? undefined,
     })
     .single();
 

@@ -5,8 +5,8 @@ import { requireOwner, verifyAuth } from "@/lib/auth/verify";
 import { parseBody } from "@/lib/api/validate";
 import { apiErr, apiOk } from "@/lib/api/response";
 import { rpcError } from "@/lib/api/errors";
-import { addMinor } from "@/lib/money";
-import { computeTax, type TaxRegime, type TaxTreatment } from "@/lib/tax";
+import { addMinor, lineAmountMinor } from "@/lib/money";
+import { computeTaxGrouped, type TaxRegime, type TaxTreatment } from "@/lib/tax";
 import { BILLABLE_DOC_KINDS, TAX_TREATMENTS } from "@/lib/domain";
 
 export const runtime = "nodejs";
@@ -49,6 +49,8 @@ const issueSchema = z.object({
         rate_minor: z.number().int().optional().nullable(),
         discount_minor: z.number().int().min(0).default(0),
         amount_minor: z.number().int().min(0),
+        /** This line's own rate. Null/omitted means the document default. */
+        tax_rate_pct: z.number().min(0).max(100).optional().nullable(),
       }),
     )
     .default([]),
@@ -82,6 +84,23 @@ export async function POST(req: NextRequest) {
     return apiErr("Add at least one item to this document", 422);
   }
 
+  // A free line's amount is derived server-side from rate × qty whenever both
+  // are given, never trusted as the bare figure the client sent — see
+  // lineAmountMinor's doc comment. A line with no rate/qty breakdown (a lump
+  // sum with just a description) is left as the client's own amount_minor.
+  const freeLines: typeof v.free_lines = [];
+  for (const line of v.free_lines) {
+    if (line.rate_minor == null || line.quantity == null) {
+      freeLines.push(line);
+      continue;
+    }
+    const amount_minor = lineAmountMinor(line.rate_minor, line.quantity, line.discount_minor);
+    if (amount_minor < 0) {
+      return apiErr(`"${line.description}": discount cannot exceed rate × quantity`, 422);
+    }
+    freeLines.push({ ...line, amount_minor });
+  }
+
   const supabase = await createClient();
 
   const [{ data: org, error: orgErr }, { data: party, error: partyErr }] = await Promise.all([
@@ -96,25 +115,35 @@ export async function POST(req: NextRequest) {
   if (partyErr) return apiErr("Could not load that party", 500);
   if (!party) return apiErr("Party not found", 404);
 
+  // Each line's own rate, or the document/org default when it has none —
+  // this is what lets a wholesale delivery mix 5% oil and 18% groceries on
+  // one invoice: grouped by rate below, not charged one rate for everything.
+  const defaultRatePct = v.tax_rate_pct ?? Number(org.default_tax_rate_pct);
+  const rateGroups: { taxableValueMinor: number; ratePct: number }[] = [];
+
   let taxableValueMinor = 0;
   if (v.activity_ids.length > 0) {
     const { data: activities, error: actErr } = await supabase
       .from("activities")
-      .select("id, amount_minor")
+      .select("id, amount_minor, tax_rate_pct")
       .in("id", v.activity_ids);
     if (actErr) return apiErr("Could not load those activities", 500);
     if ((activities ?? []).length !== v.activity_ids.length) {
       return apiErr("One or more of those activities could not be found", 404);
     }
+    for (const a of activities ?? []) {
+      rateGroups.push({ taxableValueMinor: a.amount_minor, ratePct: a.tax_rate_pct ?? defaultRatePct });
+    }
     taxableValueMinor = addMinor(...(activities ?? []).map((a) => a.amount_minor));
   }
-  taxableValueMinor = addMinor(taxableValueMinor, ...v.free_lines.map((l) => l.amount_minor));
+  for (const l of freeLines) {
+    rateGroups.push({ taxableValueMinor: l.amount_minor, ratePct: l.tax_rate_pct ?? defaultRatePct });
+  }
+  taxableValueMinor = addMinor(taxableValueMinor, ...freeLines.map((l) => l.amount_minor));
 
-  const tax = computeTax({
+  const tax = computeTaxGrouped(rateGroups, {
     regime: org.tax_regime as TaxRegime,
     treatment: v.tax_treatment as TaxTreatment,
-    taxableValueMinor,
-    ratePct: v.tax_rate_pct ?? Number(org.default_tax_rate_pct),
     supplierRegion: org.region_code,
     placeOfSupplyRegion: party.region_code,
   });
@@ -128,7 +157,7 @@ export async function POST(req: NextRequest) {
       p_total_minor: tax.totalMinor,
       p_taxes: tax.components,
       p_activity_ids: v.activity_ids,
-      p_free_lines: v.free_lines,
+      p_free_lines: freeLines,
       p_tax_treatment: v.tax_treatment,
       p_due_date: v.due_date ?? undefined,
       p_ship_to_party_id: v.ship_to_party_id ?? undefined,

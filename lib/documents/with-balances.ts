@@ -1,5 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { settlementLabel, type DocumentBalance } from "@/lib/documents/settlement";
+
+export type { DocumentBalance };
+export { settlementLabel };
 
 /**
  * Attach each document's balance, fetched SEPARATELY and merged in memory.
@@ -14,13 +18,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * That exact bug shipped in LedgerFlow. Two queries and a Map is the price of
  * never shipping it again. See CONVENTIONS.md section 11.
  */
-export interface DocumentBalance {
-  total_minor: number;
-  settled_minor: number;
-  credited_minor: number;
-  balance_due_minor: number;
-}
-
 export async function attachBalances<T extends { id: string }>(
   supabase: SupabaseClient,
   documents: T[],
@@ -49,23 +46,4 @@ export async function attachBalances<T extends { id: string }>(
   );
 
   return documents.map((d) => ({ ...d, balance: byId.get(d.id) ?? null }));
-}
-
-/**
- * Not every issued document has a balance row: `document_balances` covers
- * invoices and bills only, because a credit note is a SOURCE of an offset and
- * never a target of one. Including notes would double-count them.
- */
-export function settlementLabel(
-  balance: DocumentBalance | null,
-  status: string,
-): { label: string; tone: "settled" | "pending" | "overdue" | "muted" } {
-  if (status === "cancelled") return { label: "Cancelled", tone: "muted" };
-  if (status === "draft") return { label: "Draft", tone: "muted" };
-  if (!balance) return { label: "Issued", tone: "muted" };
-  if (balance.balance_due_minor <= 0) return { label: "Settled", tone: "settled" };
-  if (balance.settled_minor > 0 || balance.credited_minor > 0) {
-    return { label: "Part paid", tone: "pending" };
-  }
-  return { label: "Open", tone: "pending" };
 }

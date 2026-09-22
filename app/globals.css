@@ -124,6 +124,113 @@
   .row-dense { height: 2.75rem; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Marketing-page motion — a hero entrance and the gentle, continuous drift on
+   the Apple-style product preview card. Deliberately subtle (a few px, a few
+   percent opacity): this is chrome around real numbers, not the headline
+   act. All of it is `transform`/`opacity`/`box-shadow`, so it's free to run
+   continuously, and prefers-reduced-motion above already collapses it to a
+   single frame.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@theme {
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-float: float-y 6s ease-in-out infinite;
+  --animate-float-sm: float-y-sm 5.5s ease-in-out infinite;
+  --animate-glow-pulse: glow-pulse 5s ease-in-out infinite;
+  --animate-status-ping: status-ping 2.4s ease-out infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes float-y-sm {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(-1.25deg); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.06); }
+}
+
+@keyframes status-ping {
+  0% { box-shadow: 0 0 0 0 rgba(22, 121, 74, 0.45); }
+  70% { box-shadow: 0 0 0 7px rgba(22, 121, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 121, 74, 0); }
+}
+
+/* Industry icon motion — each trade's icon does something specific rather
+   than a generic hover wiggle: the truck rolls on its own wheels, the
+   recycling arrows spin through their cycle, steam lifts off the coffee cup
+   one wisp at a time, and a package settles with a small delivery bob.
+   Targets lucide's own sub-paths directly (no per-path classes exist in the
+   icon library), so the nth-child order here is tied to each icon's fixed
+   node order — see the lucide-react source if these ever need to move. */
+.icon-truck {
+  animation: truck-drive 1.6s ease-in-out infinite;
+}
+.icon-truck circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: wheel-spin 0.6s linear infinite;
+}
+
+@keyframes truck-drive {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(2px); }
+}
+@keyframes wheel-spin {
+  to { transform: rotate(360deg); }
+}
+
+.icon-recycle {
+  transform-origin: center;
+  animation: recycle-spin 3s linear infinite;
+}
+@keyframes recycle-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Coffee's steam lines are nodes 1, 2 and 4 (in that DOM order); node 3 is
+   the cup + handle and stays still. */
+.icon-coffee path:nth-child(1),
+.icon-coffee path:nth-child(2),
+.icon-coffee path:nth-child(4) {
+  transform-box: fill-box;
+  transform-origin: bottom center;
+  animation: steam-rise 2s ease-in-out infinite;
+  opacity: 0;
+}
+.icon-coffee path:nth-child(2) { animation-delay: 0.35s; }
+.icon-coffee path:nth-child(4) { animation-delay: 0.7s; }
+
+@keyframes steam-rise {
+  0% { transform: translateY(2px) scaleY(0.6); opacity: 0; }
+  35% { opacity: 0.9; }
+  100% { transform: translateY(-3px) scaleY(1); opacity: 0; }
+}
+
+.icon-wholesale {
+  animation: package-bob 2.4s ease-in-out infinite;
+}
+@keyframes package-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
 @media (max-width: 640px) {
   input, select, textarea { font-size: 16px; }
 }

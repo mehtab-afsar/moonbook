@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney } from "@/lib/money";
 import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
+import { filterPartiesForKind, type PartyRole } from "@/lib/parties/roles";
 
 export interface BillableActivity {
   id: string;
@@ -18,6 +19,8 @@ export interface PartyOption {
   id: string;
   name: string;
   payment_terms_days: number;
+  role?: PartyRole;
+  kind?: "client" | "vendor" | null;
 }
 
 const COPY = {
@@ -50,6 +53,10 @@ export function IssueForm({
 
   const party = parties.find((p) => p.id === partyId);
   const available = activitiesByParty[partyId] ?? [];
+  const eligibleParties = useMemo(
+    () => filterPartiesForKind(parties, docKind === "bill" ? "vendor" : "client"),
+    [parties, docKind],
+  );
   const dueDate = useMemo(() => {
     if (!party) return "";
     const d = new Date(`${docDate}T00:00:00Z`);
@@ -101,7 +108,7 @@ export function IssueForm({
         <label htmlFor="party" className="mb-1.5 block text-[13px] font-medium text-ink">{copy.who}</label>
         <select id="party" required value={partyId} onChange={(e) => { setPartyId(e.target.value); setSelected(new Set()); }} className={inputClass}>
           <option value="">Choose a party…</option>
-          {parties.map((p) => {
+          {eligibleParties.map((p) => {
             const n = activitiesByParty[p.id]?.length ?? 0;
             return <option key={p.id} value={p.id}>{p.name}{n > 0 ? ` — ${n} ready to bill` : ""}</option>;
           })}

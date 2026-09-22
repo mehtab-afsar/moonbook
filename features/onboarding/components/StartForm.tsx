@@ -48,11 +48,17 @@ export function StartForm({
   icons?: Record<string, ReactNode>;
 }) {
   const router = useRouter();
+  // Internal to this one component rather than two routes/pages: the
+  // organisation is created exactly once, on the final submit, so there is
+  // nothing partial to leave behind if someone closes the tab between step
+  // 2 and step 3 — they just land back on step 2 next time.
+  const [step, setStep] = useState<2 | 3>(2);
   const [country, setCountry] = useState("IN");
   const [templateKey, setTemplateKey] = useState(templates[0]?.key ?? "generic");
   const [name, setName] = useState("");
   const [taxId, setTaxId] = useState("");
   const [region, setRegion] = useState("");
+  const [invoicePrefix, setInvoicePrefix] = useState("INV");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -79,6 +85,7 @@ export function StartForm({
         tax_id: taxId || null,
         tax_id_kind: taxId ? d.taxIdKind : null,
         template_key: templateKey,
+        invoice_prefix: invoicePrefix || "INV",
       }),
     });
     const body = await res.json();
@@ -88,40 +95,33 @@ export function StartForm({
       setError(body.error ?? "Something went wrong. Please try again.");
       return;
     }
-    router.push("/dashboard");
+    const vertical = body.vertical as string | undefined;
+    router.push(vertical && vertical !== "shared" ? `/${vertical}/dashboard` : "/dashboard");
     router.refresh();
   }
 
-  return (
-    <form onSubmit={submit} className="space-y-6">
-      <div>
-        <StepBadge current={2} total={2} />
-        <h1 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.01em] text-ink">
-          Let&apos;s set up your business.
-        </h1>
-        <p className="mt-2 max-w-[52ch] text-[14px] leading-[1.55] text-ink-2">
-          A few questions. Everything else follows from your answers, and all of it can be
-          changed later.
-        </p>
-      </div>
+  if (step === 2) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <StepBadge current={2} total={3} />
+          <h1 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.01em] text-ink">
+            What kind of business is this?
+          </h1>
+          <p className="mt-2 max-w-[52ch] text-[14px] leading-[1.55] text-ink-2">
+            Sets up what you record against each job — the fields, the pricing, the
+            document types. You can change any of it later.
+          </p>
+        </div>
 
-      <div>
-        <label htmlFor="name" className="mb-1.5 block text-[13px] font-medium text-ink">
-          Business name
-        </label>
-        <input id="name" required value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
-      </div>
-
-      <div>
-        <span className="mb-1.5 block text-[13px] font-medium text-ink">What kind of business is this?</span>
-        <div className="grid gap-2.5 min-[520px]:grid-cols-2">
+        <div className="grid gap-2.5 min-[520px]:grid-cols-2 min-[820px]:grid-cols-3">
           {templates.map((t) => {
             const active = templateKey === t.key;
             return (
               <label
                 key={t.key}
                 className={`flex cursor-pointer gap-3 rounded-[10px] border p-3.5 transition-colors duration-150 ${
-                  active ? "border-brand bg-brand-tint" : "border-line bg-white hover:border-ink-3"
+                  active ? "border-ink bg-line-soft" : "border-line bg-white hover:border-ink-3"
                 }`}
               >
                 <input
@@ -134,7 +134,7 @@ export function StartForm({
                 />
                 <span
                   className={`flex size-8 shrink-0 items-center justify-center rounded-md ${
-                    active ? "bg-brand text-white" : "bg-line-soft text-ink-2"
+                    active ? "bg-ink text-white" : "bg-line-soft text-ink-2"
                   }`}
                 >
                   {icons?.[t.key] ?? <Sparkles className="size-4" strokeWidth={1.75} />}
@@ -147,9 +147,31 @@ export function StartForm({
             );
           })}
         </div>
-        <p className="mt-2 text-[12.5px] text-ink-3">
-          Sets up what you record against each job. You can change any of it later.
+
+        <button type="button" onClick={() => setStep(3)} className={buttonPrimaryClass}>
+          Continue
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-6">
+      <div>
+        <StepBadge current={3} total={3} />
+        <h1 className="text-[28px] leading-[1.15] font-semibold tracking-[-0.01em] text-ink">
+          A few details about {templates.find((t) => t.key === templateKey)?.label.toLowerCase() ?? "your business"}.
+        </h1>
+        <p className="mt-2 max-w-[52ch] text-[14px] leading-[1.55] text-ink-2">
+          Everything here can be changed later from Settings.
         </p>
+      </div>
+
+      <div>
+        <label htmlFor="name" className="mb-1.5 block text-[13px] font-medium text-ink">
+          Business name
+        </label>
+        <input id="name" required value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
       </div>
 
       <div className="space-y-4 rounded-[10px] border border-line bg-white p-4">
@@ -199,11 +221,49 @@ export function StartForm({
         </div>
       </div>
 
+      <div className="space-y-4 rounded-[10px] border border-line bg-white p-4">
+        <div>
+          <label htmlFor="invoicePrefix" className="mb-1.5 block text-[13px] font-medium text-ink">
+            Invoice numbering prefix
+          </label>
+          <input
+            id="invoicePrefix"
+            value={invoicePrefix}
+            onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase())}
+            maxLength={6}
+            placeholder="INV"
+            className={`${inputClass} w-32 font-mono uppercase`}
+          />
+          <p className="mt-1.5 text-[12.5px] text-ink-3">
+            Your first invoice will be numbered {invoicePrefix || "INV"}-{new Date().getFullYear()}-000001.
+          </p>
+        </div>
+
+        <div>
+          <span className="mb-1.5 block text-[13px] font-medium text-ink">
+            Logo <span className="font-normal text-ink-3">(optional)</span>
+          </span>
+          <div className="flex items-center gap-3 rounded-[10px] border border-dashed border-line bg-paper p-3.5">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-line bg-white text-[10px] text-ink-3">
+              No logo
+            </div>
+            <p className="text-[12.5px] text-ink-3">
+              Add this after setup, from Settings — it prints top-left on every invoice.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {error && <p className="rounded-md bg-overdue-tint p-3 text-[13px] text-overdue">{error}</p>}
 
-      <button type="submit" disabled={saving} className={buttonPrimaryClass}>
-        {saving ? "Setting up…" : "Finish setup"}
-      </button>
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={() => setStep(2)} className="text-[13.5px] text-ink-2 hover:text-ink">
+          ← Back
+        </button>
+        <button type="submit" disabled={saving} className={buttonPrimaryClass}>
+          {saving ? "Setting up…" : "Finish setup"}
+        </button>
+      </div>
     </form>
   );
 }

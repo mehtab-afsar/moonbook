@@ -4,33 +4,49 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoney, toMinor } from "@/lib/money";
 import { inputClass, buttonPrimaryClass } from "@/lib/ui/styles";
+import { filterPartiesForKind, type PartyRole } from "@/lib/parties/roles";
+import { PartyCombobox } from "@/features/parties/components/PartyCombobox";
 
 /**
  * Logistics' own recording form. Fixed fields, not a configurable field
  * system — this vertical serves one trade, so there is nothing to
- * configure. Direction picks the shape: a trip (receivable) or a vendor
- * charge (payable), the same distinction the shared engine's activity_types
- * express as data.
+ * configure.
+ *
+ * Services only — always receivable. A vendor charge is no longer logged
+ * here as its own activity; it's created on the spot, from the vendor's own
+ * invoice number, at the moment of paying them (see VendorPaymentForm on the
+ * Documents page). "Assigned vendor" below is purely an internal note about
+ * who's doing the work — nothing that renders the client's invoice reads it.
  */
 export function ActivityForm({
   parties,
+  originSuggestions,
+  destinationSuggestions,
   currency,
   locale,
+  onDone,
 }: {
-  parties: { id: string; name: string }[];
+  parties: { id: string; name: string; role?: PartyRole; kind?: "client" | "vendor" | null }[];
+  /** Places used before, org-wide — offered as suggestions, never enforced;
+   *  typing anything else is always fine. */
+  originSuggestions: string[];
+  destinationSuggestions: string[];
   currency: string;
   locale: string;
+  onDone?: () => void;
 }) {
   const router = useRouter();
-  const [direction, setDirection] = useState<"receivable" | "payable">("receivable");
+  const clientParties = useMemo(() => filterPartiesForKind(parties, "client"), [parties]);
+  const vendorParties = useMemo(() => filterPartiesForKind(parties, "vendor"), [parties]);
   const [partyId, setPartyId] = useState("");
   const [billToPartyId, setBillToPartyId] = useState("");
+  const [assignedVendorId, setAssignedVendorId] = useState("");
   const [occurredOn, setOccurredOn] = useState(new Date().toISOString().slice(0, 10));
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [vehicleNo, setVehicleNo] = useState("");
   const [loadType, setLoadType] = useState("");
-  const [vendorRef, setVendorRef] = useState("");
+  const [distanceKm, setDistanceKm] = useState("");
   const [amount, setAmount] = useState("");
   const [directCost, setDirectCost] = useState("");
   const [reference, setReference] = useState("");
@@ -55,18 +71,19 @@ export function ActivityForm({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        direction,
+        direction: "receivable",
         party_id: partyId,
         bill_to_party_id: billToPartyId || null,
+        assigned_vendor_id: assignedVendorId || null,
         occurred_on: occurredOn,
         amount_minor: amountMinor,
-        direct_cost_minor: direction === "receivable" ? costMinor : null,
-        origin: direction === "receivable" ? origin || null : null,
-        destination: direction === "receivable" ? destination || null : null,
-        vehicle_no: direction === "receivable" ? vehicleNo || null : null,
-        load_type: direction === "receivable" ? loadType || null : null,
-        vendor_ref: direction === "payable" ? vendorRef || null : null,
+        direct_cost_minor: costMinor,
+        origin: origin || null,
+        destination: destination || null,
+        vehicle_no: vehicleNo || null,
+        load_type: loadType || null,
         reference: reference || null,
+        distance_km: distanceKm.trim() ? Number(distanceKm) : null,
       }),
     });
     const body = await res.json();
@@ -76,37 +93,24 @@ export function ActivityForm({
       setError(body.error ?? "Could not record this.");
       return;
     }
-    setPartyId(""); setBillToPartyId(""); setOrigin(""); setDestination("");
-    setVehicleNo(""); setLoadType(""); setVendorRef(""); setAmount("");
+    setPartyId(""); setBillToPartyId(""); setAssignedVendorId(""); setOrigin(""); setDestination("");
+    setVehicleNo(""); setLoadType(""); setDistanceKm(""); setAmount("");
     setDirectCost(""); setReference("");
+    onDone?.();
     router.refresh();
   }
 
   return (
     <form onSubmit={submit} className="space-y-4 rounded-[10px] border border-line bg-white p-5">
       <div className="grid gap-3 min-[640px]:grid-cols-3">
-        <Labelled label="What" htmlFor="direction">
-          <select
-            id="direction" value={direction}
-            onChange={(e) => setDirection(e.target.value as "receivable" | "payable")}
-            className={inputClass}
-          >
-            <option value="receivable">Trip</option>
-            <option value="payable">Vendor charge (we pay)</option>
-          </select>
-        </Labelled>
-
-        <Labelled label="Party" htmlFor="party">
-          <select id="party" required value={partyId} onChange={(e) => setPartyId(e.target.value)} className={inputClass}>
-            <option value="">Select…</option>
-            {parties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+        <Labelled label="Client" htmlFor="party">
+          <PartyCombobox id="party" required parties={clientParties} value={partyId} onChange={setPartyId} />
         </Labelled>
 
         <Labelled label="Bill to (if different)" htmlFor="billTo">
           <select id="billTo" value={billToPartyId} onChange={(e) => setBillToPartyId(e.target.value)} className={inputClass}>
             <option value="">Same as party</option>
-            {parties.filter((p) => p.id !== partyId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {clientParties.filter((p) => p.id !== partyId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
         </Labelled>
 
@@ -115,33 +119,54 @@ export function ActivityForm({
         </Labelled>
       </div>
 
-      {direction === "receivable" ? (
-        <div className="grid gap-3 border-t border-line-soft pt-4 min-[640px]:grid-cols-2">
-          <Labelled label="Origin" htmlFor="origin">
-            <input id="origin" required value={origin} onChange={(e) => setOrigin(e.target.value)} className={inputClass} />
-          </Labelled>
-          <Labelled label="Destination" htmlFor="destination">
-            <input id="destination" required value={destination} onChange={(e) => setDestination(e.target.value)} className={inputClass} />
-          </Labelled>
-          <Labelled label="Vehicle no. (optional)" htmlFor="vehicle">
-            <input id="vehicle" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className={inputClass} />
-          </Labelled>
-          <Labelled label="Load type (optional)" htmlFor="loadType">
-            <select id="loadType" value={loadType} onChange={(e) => setLoadType(e.target.value)} className={inputClass}>
-              <option value="">Select…</option>
-              <option value="Full truckload">Full truckload</option>
-              <option value="Part load">Part load</option>
-              <option value="Express">Express</option>
-            </select>
-          </Labelled>
-        </div>
-      ) : (
-        <div className="grid gap-3 border-t border-line-soft pt-4 min-[640px]:grid-cols-2">
-          <Labelled label="Vendor invoice / LR no. (optional)" htmlFor="vendorRef">
-            <input id="vendorRef" value={vendorRef} onChange={(e) => setVendorRef(e.target.value)} className={inputClass} />
-          </Labelled>
-        </div>
-      )}
+      <div className="grid gap-3 border-t border-line-soft pt-4 min-[640px]:grid-cols-2">
+        <Labelled label="Origin" htmlFor="origin">
+          <input
+            id="origin" required list="origin-suggestions" value={origin}
+            onChange={(e) => setOrigin(e.target.value)} className={inputClass}
+          />
+          <datalist id="origin-suggestions">
+            {originSuggestions.map((o) => <option key={o} value={o} />)}
+          </datalist>
+        </Labelled>
+        <Labelled label="Destination" htmlFor="destination">
+          <input
+            id="destination" required list="destination-suggestions" value={destination}
+            onChange={(e) => setDestination(e.target.value)} className={inputClass}
+          />
+          <datalist id="destination-suggestions">
+            {destinationSuggestions.map((d) => <option key={d} value={d} />)}
+          </datalist>
+        </Labelled>
+        <Labelled label="Distance (km, optional)" htmlFor="distance">
+          <input
+            id="distance" type="number" step="0.1" min="0" value={distanceKm}
+            onChange={(e) => setDistanceKm(e.target.value)} className={`${inputClass} font-mono`}
+          />
+        </Labelled>
+        <Labelled label="Vehicle no. (optional)" htmlFor="vehicle">
+          <input id="vehicle" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className={inputClass} />
+        </Labelled>
+        <Labelled label="Load type (optional)" htmlFor="loadType">
+          <select id="loadType" value={loadType} onChange={(e) => setLoadType(e.target.value)} className={inputClass}>
+            <option value="">Select…</option>
+            <option value="Full truckload">Full truckload</option>
+            <option value="Part load">Part load</option>
+            <option value="Express">Express</option>
+          </select>
+        </Labelled>
+        <Labelled label="Assigned vendor (optional, internal only)" htmlFor="assignedVendor">
+          {/* filterPartiesForKind is permissive toward unclassified parties
+              (kind unset, no billing history) so a brand-new vendor can be
+              assigned here before their first bill exists — it only ever
+              excludes a party explicitly added as a client. */}
+          <PartyCombobox
+            id="assignedVendor" parties={vendorParties}
+            value={assignedVendorId} onChange={setAssignedVendorId}
+            placeholder="Not assigned yet"
+          />
+        </Labelled>
+      </div>
 
       <div className="grid gap-3 border-t border-line-soft pt-4 min-[640px]:grid-cols-3">
         <Labelled label="Reference (optional)" htmlFor="ref">
@@ -150,11 +175,9 @@ export function ActivityForm({
         <Labelled label={`Amount (${currency})`} htmlFor="amount">
           <input id="amount" type="number" step="any" required value={amount} onChange={(e) => setAmount(e.target.value)} className={`${inputClass} font-mono`} />
         </Labelled>
-        {direction === "receivable" && (
-          <Labelled label={`Direct cost (${currency}, optional)`} htmlFor="cost">
-            <input id="cost" type="number" step="any" min="0" value={directCost} onChange={(e) => setDirectCost(e.target.value)} className={`${inputClass} font-mono`} />
-          </Labelled>
-        )}
+        <Labelled label={`Direct cost (${currency}, optional)`} htmlFor="cost">
+          <input id="cost" type="number" step="any" min="0" value={directCost} onChange={(e) => setDirectCost(e.target.value)} className={`${inputClass} font-mono`} />
+        </Labelled>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
@@ -162,7 +185,7 @@ export function ActivityForm({
           {amountMinor !== null && (
             <>
               Amount: <span className="font-mono font-medium text-ink">{formatMoney(amountMinor, currency, locale)}</span>
-              {direction === "receivable" && costMinor !== null && (
+              {costMinor !== null && (
                 <span className="text-ink-3">
                   {" "}
                   · Margin: <span className="font-mono font-medium text-ink">{formatMoney(amountMinor - costMinor, currency, locale)}</span>

@@ -11,7 +11,7 @@ import { toMinor, type CurrencyCode } from "@/lib/money";
 export const runtime = "nodejs";
 
 const COLUMNS =
-  "id, party_id, bill_to_party_id, direction, occurred_on, currency, amount_minor, direct_cost_minor, material, grade, net_weight_kg, rate_per_kg_minor, ticket_no, vehicle_no, reference, notes, status, attachment_path, created_at";
+  "id, party_id, bill_to_party_id, direction, occurred_on, currency, amount_minor, direct_cost_minor, material, grade, net_weight_kg, rate_per_kg_minor, ticket_no, vehicle_no, reference, notes, status, attachment_path, assigned_vendor_id, created_at";
 
 export async function GET() {
   const auth = await verifyAuth();
@@ -44,6 +44,7 @@ const recordSchema = z.object({
   reference: z.string().trim().max(100).optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
   direct_cost_minor: z.number().int().min(0).optional().nullable(),
+  assigned_vendor_id: z.uuid().optional().nullable(),
 });
 
 /**
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
       p_reference: v.reference ?? undefined,
       p_notes: v.notes ?? undefined,
       p_direct_cost_minor: v.direct_cost_minor ?? undefined,
+      p_assigned_vendor_id: v.assigned_vendor_id ?? undefined,
     })
     .single();
 

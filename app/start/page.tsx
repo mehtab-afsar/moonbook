@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { Truck, Recycle, Coffee, Package } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { postSignInDestination } from "@/lib/auth/post-signin-destination";
 import { EmailSignIn } from "@/features/onboarding/components/EmailSignIn";
 import { StartForm, type IndustryTemplate } from "@/features/onboarding/components/StartForm";
 import { SiteHeader } from "@/features/marketing/components/SiteHeader";
@@ -23,13 +24,22 @@ const TEMPLATE_ICON: Record<string, ReactNode> = {
   wholesale: <Package {...ICON_SIZE} />,
 };
 
-export default async function StartPage() {
+export default async function StartPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ email?: string }>;
+}) {
+  const { email } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (user) {
-    const { data: profile } = await supabase.from("profiles").select("id").eq("id", user.id).maybeSingle();
-    if (profile) redirect("/dashboard");
+    // Also tries accept_org_invite() when there's no profile yet — a
+    // freshly signed-up person whose email matches a pending invite joins
+    // that org instead of seeing the "create your business" form below.
+    // Returns "/start" itself only when there is truly nothing to join.
+    const dest = await postSignInDestination(supabase, "/dashboard");
+    if (dest !== "/start") redirect(dest);
   }
 
   // The industries on offer are rows, not a hardcoded list — adding one is a
@@ -47,15 +57,17 @@ export default async function StartPage() {
   return (
     <div className="min-h-dvh bg-paper text-ink">
       <SiteHeader />
-      <div className="mx-auto max-w-[560px] px-7 py-14">
+      <div className="mx-auto max-w-[960px] px-7 py-14">
         {user ? (
           <StartForm templates={templates} icons={TEMPLATE_ICON} />
         ) : (
           <EmailSignIn
             next="/start"
             heading="Let's get you set up."
-            reason="Enter your email — we'll send a link, and you're straight into setup."
-            step={{ current: 1, total: 2 }}
+            reason="Create an account with an email and password to get started."
+            step={{ current: 1, total: 3 }}
+            mode="signup"
+            defaultEmail={email}
           />
         )}
       </div>

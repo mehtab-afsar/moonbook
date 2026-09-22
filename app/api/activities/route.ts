@@ -14,7 +14,7 @@ import {
 export const runtime = "nodejs";
 
 const COLUMNS =
-  "id, activity_type_id, party_id, bill_to_party_id, direction, currency, occurred_on, amount_minor, direct_cost_minor, reference, status, dim1_key, dim1_value, details, created_at";
+  "id, activity_type_id, party_id, bill_to_party_id, direction, currency, occurred_on, amount_minor, direct_cost_minor, tax_rate_pct, reference, status, dim1_key, dim1_value, details, created_at";
 
 export async function GET() {
   const auth = await verifyAuth();
@@ -50,6 +50,8 @@ const recordSchema = z.object({
   period_end: z.iso.date().optional().nullable(),
   /** What this job cost to deliver — revenue minus this is its margin. */
   direct_cost_minor: z.number().int().min(0).optional().nullable(),
+  /** Overrides the organisation's default tax rate for this one line. */
+  tax_rate_pct: z.number().min(0).max(100).optional().nullable(),
 });
 
 /**
@@ -130,6 +132,7 @@ export async function POST(req: NextRequest) {
       p_period_end: v.period_end ?? undefined,
       p_notes: v.notes ?? undefined,
       p_direct_cost_minor: v.direct_cost_minor ?? undefined,
+      p_tax_rate_pct: v.tax_rate_pct ?? undefined,
     })
     .single();
 

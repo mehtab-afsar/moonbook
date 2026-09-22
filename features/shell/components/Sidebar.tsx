@@ -1,44 +1,58 @@
 "use client";
 
+import { useRef, useState } from "react";
+import type { FocusEvent } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
-import { LayoutDashboard, FileText, Banknote, PackageCheck, Receipt, Users, Settings, LogOut } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { LayoutDashboard, FileText, Banknote, PackageCheck, Receipt, Users, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+import { Logomark } from "@/features/marketing/components/Logomark";
 
-/**
- * A 60px icon rail that expands to 240px on hover or keyboard focus.
- *
- * The expansion is an OVERLAY, not a width change in the flex row: the outer
- * div is a permanent 60px spacer and the aside is absolutely positioned inside
- * it. If the aside itself grew, every table to its right would re-layout on
- * each hover — a visible shudder on a page of forty rows.
- *
- * Open state is React, deliberately NOT CSS `:focus-within`: clicking a Link
- * leaves focus inside the rail, so a CSS-only version stays pinned open after
- * you navigate.
- */
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/payments", label: "Payments", icon: Banknote },
+  { href: "/payments", label: "Receipts", icon: Banknote },
   { href: "/activities", label: "Activity log", icon: PackageCheck },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/parties", label: "Parties", icon: Users },
-  { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 const CLOSE_DELAY_MS = 100;
 
+/**
+ * A 60px icon rail that expands to 240px on hover or keyboard focus.
+ *
+ * `open` is React state, deliberately not CSS `:hover`/`:focus-within`:
+ * those keep the rail pinned open after a Link is clicked, since the
+ * clicked link keeps browser focus until something else takes it — the
+ * mouse leaving doesn't help, CSS has no "leave" signal independent of
+ * focus. Explicit pointer/focus handlers close it whenever the mouse
+ * actually leaves, click or not — the same fix LedgerFlow's Sidebar uses.
+ */
 export function Sidebar({ orgName, userName }: { orgName: string; userName: string }) {
   const pathname = usePathname();
-  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function signOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
+  function clearCloseTimer() {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  }
+
+  function openNow() {
+    clearCloseTimer();
+    setOpen(true);
+  }
+
+  function closeSoon() {
+    clearCloseTimer();
+    closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY_MS);
+  }
+
+  function handleBlur(e: FocusEvent<HTMLElement>) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false);
   }
 
   function isActive(href: string) {
@@ -46,24 +60,30 @@ export function Sidebar({ orgName, userName }: { orgName: string; userName: stri
   }
 
   return (
-    <div className="group relative w-[60px] shrink-0">
+    <div className="relative w-[60px] shrink-0" aria-expanded={open}>
       <aside
+        onMouseEnter={openNow}
+        onMouseLeave={closeSoon}
+        onFocus={openNow}
+        onBlur={handleBlur}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setOpen(false);
+            (document.activeElement as HTMLElement | null)?.blur();
+          }
+        }}
         className={cn(
           "absolute inset-y-0 left-0 z-40 flex w-[60px] flex-col overflow-hidden",
           "border-r border-line bg-white transition-[width,box-shadow] duration-200 ease-out",
-          "group-hover:w-60 group-hover:shadow-lg",
-          "group-focus-within:w-60 group-focus-within:shadow-lg",
+          open && "w-60 shadow-lg",
         )}
-        style={{ transitionDelay: `${0}ms`, ["--close-delay" as string]: `${CLOSE_DELAY_MS}ms` }}
       >
         {/* pl-3.5 puts the 32px mark and the 16px nav icons on the same
             centreline — 30px, the middle of the rail — so nothing shifts
             horizontally as the panel opens. */}
         <div className="flex items-center gap-2.5 py-4 pl-3.5 pr-4">
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <span className="font-mono text-[15px] font-medium leading-none">M</span>
-          </div>
-          <div className="min-w-0 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
+          <Logomark className="size-8 shrink-0" />
+          <div className={cn("min-w-0 opacity-0 transition-opacity duration-200", open && "opacity-100")}>
             <p className="truncate text-sm font-semibold leading-tight text-ink">{orgName}</p>
             <p className="truncate text-xs text-ink-3">{userName}</p>
           </div>
@@ -77,13 +97,14 @@ export function Sidebar({ orgName, userName }: { orgName: string; userName: stri
                 key={href}
                 href={href}
                 aria-current={active ? "page" : undefined}
+                onClick={() => setOpen(false)}
                 className={cn(
-                  "mx-2 flex items-center gap-2.5 rounded-md py-2 pl-3.5 pr-2.5 text-sm transition-colors duration-150",
+                  "mx-2 flex items-center gap-2.5 overflow-hidden rounded-md py-2 pl-3.5 pr-2.5 text-sm transition-colors duration-150",
                   active ? "bg-primary text-primary-foreground" : "text-ink-2 hover:bg-line-soft",
                 )}
               >
                 <Icon className="size-4 shrink-0" strokeWidth={1.5} />
-                <span className="truncate opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
+                <span className={cn("truncate opacity-0 transition-opacity duration-200", open && "opacity-100")}>
                   {label}
                 </span>
               </Link>
@@ -91,16 +112,22 @@ export function Sidebar({ orgName, userName }: { orgName: string; userName: stri
           })}
         </nav>
 
-        <button
-          type="button"
-          onClick={signOut}
-          className="mx-2 mb-3 flex items-center gap-2.5 rounded-md py-2 pl-3.5 pr-2.5 text-sm text-ink-2 transition-colors duration-150 hover:bg-line-soft"
-        >
-          <LogOut className="size-4 shrink-0" strokeWidth={1.5} />
-          <span className="truncate opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100">
-            Sign out
-          </span>
-        </button>
+        <div className="border-t border-line-soft py-2">
+          <Link
+            href="/settings"
+            aria-current={isActive("/settings") ? "page" : undefined}
+            onClick={() => setOpen(false)}
+            className={cn(
+              "mx-2 mb-1 flex items-center gap-2.5 overflow-hidden rounded-md py-2 pl-3.5 pr-2.5 text-sm transition-colors duration-150",
+              isActive("/settings") ? "bg-primary text-primary-foreground" : "text-ink-2 hover:bg-line-soft",
+            )}
+          >
+            <Settings className="size-4 shrink-0" strokeWidth={1.5} />
+            <span className={cn("truncate opacity-0 transition-opacity duration-200", open && "opacity-100")}>
+              Settings
+            </span>
+          </Link>
+        </div>
       </aside>
     </div>
   );

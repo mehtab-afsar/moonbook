@@ -1,19 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { verifyAuth } from "@/lib/auth/verify";
-import { formatMoney } from "@/lib/money";
-import { ReceiptForm, type OpenDocument } from "@/features/payments/components/ReceiptForm";
+import { type OpenDocument } from "@/features/payments/components/ReceiptForm";
+import { ReceiptsPanel, type PaymentRow } from "@/features/payments/components/ReceiptsPanel";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Payments" };
-
-const METHOD_LABEL: Record<string, string> = {
-  bank: "Bank transfer",
-  cash: "Cash",
-  cheque: "Cheque",
-  card: "Card",
-  online: "Online",
-};
+export const metadata = { title: "Receipts" };
 
 /** Group open document_balances rows by counterparty, for one direction. */
 function groupOpen(
@@ -49,7 +41,7 @@ export default async function PaymentsPage() {
     { data: applied },
   ] = await Promise.all([
     supabase.from("organisations").select("locale, timezone, base_currency").eq("id", auth.ctx.orgId).single(),
-    supabase.from("parties").select("id, name").order("name"),
+    supabase.from("parties").select("id, name, kind").order("name"),
     supabase
       .from("payments")
       // FK named: payments reaches parties by one key today, but naming it
@@ -91,6 +83,7 @@ export default async function PaymentsPage() {
   if (outErr) throw new Error(`Could not load vendor payments: ${outErr.message}`);
 
   const locale = org?.locale ?? "en";
+  const partiesTyped = (parties ?? []).map((p) => ({ ...p, kind: p.kind as "client" | "vendor" | null }));
 
   const openByParty = groupOpen(openReceivable ?? []);
   const openPayableByParty = groupOpen(openPayable ?? []);
@@ -103,135 +96,54 @@ export default async function PaymentsPage() {
     timeZone: org?.timezone ?? "UTC", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date());
 
+  const toRows = (rows: { id: string; paid_on: string; method: string; reference_no: string | null; currency: string; amount_minor: number; parties: { name: string } | null }[] | null): PaymentRow[] =>
+    (rows ?? []).map((p) => ({
+      id: p.id,
+      paid_on: p.paid_on,
+      method: p.method,
+      reference_no: p.reference_no,
+      currency: p.currency,
+      amount_minor: p.amount_minor,
+      party_name: p.parties?.name ?? null,
+    }));
+
   return (
-    <div className="space-y-10 p-8">
-      <section className="space-y-6">
-        <header>
-          <h1 className="text-[22px] font-semibold tracking-[-0.01em] text-ink">Payments</h1>
-          <p className="mt-1 text-[13.5px] text-ink-2">
-            Money received. A receipt need not settle anything exactly — whatever is left over
-            stays visible as unapplied credit rather than being forced onto an invoice.
-          </p>
-        </header>
+    <div className="mx-auto max-w-[1200px] space-y-10 p-8">
+      <ReceiptsPanel
+        heading="h1"
+        title="Receipts"
+        description="Money received. A receipt need not settle anything exactly — whatever is left over stays visible as unapplied credit rather than being forced onto an invoice."
+        addLabel="Record receipt"
+        parties={partiesTyped}
+        openByParty={openByParty}
+        rows={toRows(receipts)}
+        unappliedById={unappliedById}
+        locale={locale}
+        today={today}
+        direction="in"
+        defaultCurrency={org?.base_currency ?? "INR"}
+        partyColumn="From"
+        emptyLabel="Nothing received yet."
+        pdfHrefPrefix="/api/payments"
+      />
 
-        <ReceiptForm
-          parties={parties ?? []}
-          openByParty={openByParty}
-          locale={locale}
-          today={today}
-          direction="in"
-          defaultCurrency={org?.base_currency ?? "INR"}
-        />
-
-        <PaymentsTable
-          rows={receipts ?? []}
-          unappliedById={unappliedById}
-          locale={locale}
-          partyColumn="From"
-          emptyLabel="Nothing received yet."
-        />
-      </section>
-
-      <section className="space-y-6">
-        <header>
-          <h2 className="text-[18px] font-semibold tracking-[-0.01em] text-ink">Vendor payments</h2>
-          <p className="mt-1 text-[13.5px] text-ink-2">
-            Money paid out, including advances paid before a vendor&apos;s bill has arrived —
-            those stay visible as unapplied until there&apos;s a bill to apply them to.
-          </p>
-        </header>
-
-        <ReceiptForm
-          parties={parties ?? []}
-          openByParty={openPayableByParty}
-          locale={locale}
-          today={today}
-          direction="out"
-          defaultCurrency={org?.base_currency ?? "INR"}
-        />
-
-        <PaymentsTable
-          rows={outPayments ?? []}
-          unappliedById={unappliedById}
-          locale={locale}
-          partyColumn="To"
-          emptyLabel="Nothing paid out yet."
-        />
-      </section>
-    </div>
-  );
-}
-
-type PaymentRow = {
-  id: string;
-  paid_on: string;
-  method: string;
-  reference_no: string | null;
-  currency: string;
-  amount_minor: number;
-  parties: { name: string } | null;
-};
-
-function PaymentsTable({
-  rows,
-  unappliedById,
-  locale,
-  partyColumn,
-  emptyLabel,
-}: {
-  rows: unknown[];
-  unappliedById: Map<string, number>;
-  locale: string;
-  partyColumn: string;
-  emptyLabel: string;
-}) {
-  const payments = rows as unknown as PaymentRow[];
-  return (
-    <div className="overflow-x-auto rounded-[10px] border border-line bg-white">
-      <table className="w-full text-left text-[13.5px]">
-        <thead>
-          <tr className="border-b border-line-soft text-[12px] uppercase tracking-wide text-ink-3">
-            <th className="px-5 py-3 font-medium">Date</th>
-            <th className="px-5 py-3 font-medium">{partyColumn}</th>
-            <th className="px-5 py-3 font-medium">How</th>
-            <th className="px-5 py-3 font-medium">Reference</th>
-            <th className="px-5 py-3 font-medium">Amount</th>
-            <th className="px-5 py-3 font-medium">Unapplied</th>
-          </tr>
-        </thead>
-        <tbody>
-          {payments.length === 0 && (
-            <tr>
-              <td colSpan={6} className="px-5 py-10 text-center text-ink-3">
-                {emptyLabel}
-              </td>
-            </tr>
-          )}
-          {payments.map((p) => {
-            const unapplied = unappliedById.get(p.id) ?? 0;
-            return (
-              <tr key={p.id} className="border-b border-line-soft last:border-b-0">
-                <td className="px-5 py-3 font-mono text-ink-2">{p.paid_on}</td>
-                <td className="px-5 py-3 font-medium text-ink">{p.parties?.name ?? "—"}</td>
-                <td className="px-5 py-3 text-ink-2">{METHOD_LABEL[p.method] ?? p.method}</td>
-                <td className="px-5 py-3 font-mono text-ink-2">{p.reference_no ?? "—"}</td>
-                <td className="px-5 py-3 font-mono text-ink">
-                  {formatMoney(p.amount_minor, p.currency, locale)}
-                </td>
-                <td className="px-5 py-3 font-mono">
-                  {unapplied > 0 ? (
-                    <span className="text-pending-ink">
-                      {formatMoney(unapplied, p.currency, locale)}
-                    </span>
-                  ) : (
-                    <span className="text-ink-3">—</span>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <ReceiptsPanel
+        heading="h2"
+        title="Vendor payments"
+        description="Money paid out, including advances paid before a vendor's bill has arrived — those stay visible as unapplied until there's a bill to apply them to."
+        addLabel="Record payment"
+        parties={partiesTyped}
+        openByParty={openPayableByParty}
+        rows={toRows(outPayments)}
+        unappliedById={unappliedById}
+        locale={locale}
+        today={today}
+        direction="out"
+        defaultCurrency={org?.base_currency ?? "INR"}
+        partyColumn="To"
+        emptyLabel="Nothing paid out yet."
+        pdfHrefPrefix="/api/payments"
+      />
     </div>
   );
 }
